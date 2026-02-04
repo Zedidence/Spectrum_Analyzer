@@ -1,0 +1,13 @@
+# Web Framework and WebSocket Support
+flask>=3.0.0
+flask-socketio>=5.3.0
+python-socketio>=5.9.0
+eventlet>=0.33.0
+
+# Signal Processing
+numpy>=1.20.0
+scipy>=1.7.0
+pyFFTW>=0.13.0
+
+# GNU Radio is already installed system-wide via apt
+# gr-osmosdr is included with GNU Radio installation

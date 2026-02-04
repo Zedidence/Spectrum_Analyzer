@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spectrum Analyzer - BladeRF</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <!-- Socket.IO client from CDN -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔊 Spectrum Analyzer</h1>
+            <div class="connection-status" id="connection-status">
+                <span class="status-indicator" id="status-indicator"></span>
+                <span id="status-text">Connecting...</span>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <!-- Left Sidebar - Controls -->
+            <aside class="control-panel">
+                <h2>Controls</h2>
+
+                <!-- Streaming Control -->
+                <div class="control-section">
+                    <button id="start-btn" class="btn btn-primary">▶ Start</button>
+                    <button id="stop-btn" class="btn btn-danger" disabled>⏹ Stop</button>
+                </div>
+
+                <!-- Frequency Control -->
+                <div class="control-section">
+                    <label for="frequency">Center Frequency (MHz)</label>
+                    <input type="number" id="frequency" value="100" min="20" max="6000" step="0.1">
+                    <div class="preset-buttons">
+                        <button class="btn-preset" data-freq="100">FM (100 MHz)</button>
+                        <button class="btn-preset" data-freq="433.92">ISM (433.92 MHz)</button>
+                        <button class="btn-preset" data-freq="915">ISM (915 MHz)</button>
+                        <button class="btn-preset" data-freq="2400">WiFi (2.4 GHz)</button>
+                    </div>
+                </div>
+
+                <!-- Bandwidth Control -->
+                <div class="control-section">
+                    <label for="bandwidth">Bandwidth</label>
+                    <select id="bandwidth">
+                        <option value="200000">200 kHz</option>
+                        <option value="500000">500 kHz</option>
+                        <option value="1000000">1 MHz</option>
+                        <option value="2000000" selected>2 MHz</option>
+                        <option value="5000000">5 MHz</option>
+                    </select>
+                </div>
+
+                <!-- Gain Control -->
+                <div class="control-section">
+                    <label for="gain">Gain: <span id="gain-value">30</span> dB</label>
+                    <input type="range" id="gain" min="0" max="60" value="30" step="1">
+                </div>
+
+                <!-- Device Info -->
+                <div class="control-section">
+                    <h3>Device Status</h3>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">Sample Rate:</span>
+                            <span id="sample-rate">--</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">FFT Size:</span>
+                            <span id="fft-size">--</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Update Rate:</span>
+                            <span id="update-rate">--</span>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Right Side - Displays -->
+            <main class="display-area">
+                <!-- Spectrum Display -->
+                <div class="display-container">
+                    <div class="display-header">
+                        <h3>Spectrum</h3>
+                        <div class="display-info">
+                            <span id="peak-freq">Peak: --</span>
+                            <span id="peak-power">Power: --</span>
+                        </div>
+                    </div>
+                    <canvas id="spectrum-canvas"></canvas>
+                </div>
+
+                <!-- Waterfall Display -->
+                <div class="display-container">
+                    <div class="display-header">
+                        <h3>Waterfall</h3>
+                        <div class="display-info">
+                            <span>History: <span id="waterfall-history">0</span> lines</span>
+                        </div>
+                    </div>
+                    <canvas id="waterfall-canvas"></canvas>
+                </div>
+            </main>
+        </div>
+
+        <footer>
+            <p>Spectrum Analyzer for BladeRF | Running on Raspberry Pi 5 (DragonOS)</p>
+        </footer>
+    </div>
+
+    <!-- JavaScript modules -->
+    <script src="/static/js/spectrum.js"></script>
+    <script src="/static/js/waterfall.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

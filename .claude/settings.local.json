@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dpkg -l:*)",
+      "Bash(ls:*)",
+      "Read(//home/dragon/.config/sdrpp/**)",
+      "Bash(pkg-config:*)",
+      "Bash(SoapySDRUtil:*)",
+      "Bash(gnuradio-config-info:*)",
+      "Bash(ldconfig:*)",
+      "Bash(gcc:*)",
+      "Bash(g++:*)",
+      "Bash(cmake:*)",
+      "Bash(pip3 install:*)",
+      "Bash(chmod:*)",
+      "Bash(tree:*)"
+    ]
+  }
+}

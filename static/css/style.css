@@ -1,0 +1,349 @@
+/**
+ * Spectrum Analyzer Stylesheet
+ * Dark theme optimized for signal visualization
+ */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #0a0e27;
+    color: #e0e6ed;
+    overflow: hidden;
+}
+
+.container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+/* Header */
+header {
+    background: linear-gradient(135deg, #1a2332 0%, #2a3548 100%);
+    padding: 15px 30px;
+    border-bottom: 2px solid #3a4558;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+header h1 {
+    font-size: 24px;
+    font-weight: 600;
+    color: #00d9ff;
+}
+
+.connection-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+}
+
+.status-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: #666;
+    animation: pulse 2s infinite;
+}
+
+.status-indicator.connected {
+    background-color: #00ff88;
+}
+
+.status-indicator.disconnected {
+    background-color: #ff4444;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* Main Content */
+.main-content {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* Control Panel (Left Sidebar) */
+.control-panel {
+    width: 300px;
+    background-color: #151d2f;
+    border-right: 2px solid #3a4558;
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.control-panel h2 {
+    font-size: 18px;
+    margin-bottom: 20px;
+    color: #00d9ff;
+}
+
+.control-section {
+    margin-bottom: 25px;
+}
+
+.control-section label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: #a0b0c0;
+    font-weight: 500;
+}
+
+.control-section input[type="number"],
+.control-section select {
+    width: 100%;
+    padding: 10px;
+    background-color: #1a2332;
+    border: 1px solid #3a4558;
+    border-radius: 5px;
+    color: #e0e6ed;
+    font-size: 14px;
+}
+
+.control-section input[type="number"]:focus,
+.control-section select:focus {
+    outline: none;
+    border-color: #00d9ff;
+}
+
+.control-section input[type="range"] {
+    width: 100%;
+    height: 6px;
+    background: #1a2332;
+    border-radius: 3px;
+    outline: none;
+}
+
+.control-section input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    background: #00d9ff;
+    border-radius: 50%;
+    cursor: pointer;
+}
+
+.control-section input[type="range"]::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    background: #00d9ff;
+    border-radius: 50%;
+    cursor: pointer;
+    border: none;
+}
+
+/* Buttons */
+.btn {
+    padding: 12px 20px;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-right: 10px;
+}
+
+.btn-primary {
+    background-color: #00d9ff;
+    color: #0a0e27;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background-color: #00b8e6;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 217, 255, 0.4);
+}
+
+.btn-danger {
+    background-color: #ff4444;
+    color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+    background-color: #e03333;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 68, 68, 0.4);
+}
+
+.btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.preset-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.btn-preset {
+    padding: 8px;
+    background-color: #1a2332;
+    border: 1px solid #3a4558;
+    border-radius: 4px;
+    color: #a0b0c0;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-preset:hover {
+    background-color: #2a3548;
+    border-color: #00d9ff;
+    color: #00d9ff;
+}
+
+/* Device Info */
+.control-section h3 {
+    font-size: 14px;
+    color: #00d9ff;
+    margin-bottom: 12px;
+}
+
+.info-grid {
+    background-color: #1a2332;
+    border-radius: 6px;
+    padding: 12px;
+}
+
+.info-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    font-size: 13px;
+}
+
+.info-label {
+    color: #a0b0c0;
+}
+
+.info-item span:last-child {
+    color: #00d9ff;
+    font-weight: 600;
+}
+
+/* Display Area (Right Side) */
+.display-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    gap: 20px;
+    overflow: hidden;
+}
+
+.display-container {
+    flex: 1;
+    background-color: #151d2f;
+    border-radius: 8px;
+    border: 2px solid #3a4558;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.display-header {
+    padding: 12px 20px;
+    background-color: #1a2332;
+    border-bottom: 2px solid #3a4558;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.display-header h3 {
+    font-size: 16px;
+    color: #00d9ff;
+}
+
+.display-info {
+    display: flex;
+    gap: 20px;
+    font-size: 12px;
+    color: #a0b0c0;
+}
+
+canvas {
+    flex: 1;
+    width: 100%;
+    height: 100%;
+}
+
+/* Footer */
+footer {
+    background-color: #151d2f;
+    border-top: 2px solid #3a4558;
+    padding: 12px 30px;
+    text-align: center;
+    font-size: 12px;
+    color: #6a7a8a;
+}
+
+/* Scrollbar Styling */
+.control-panel::-webkit-scrollbar {
+    width: 8px;
+}
+
+.control-panel::-webkit-scrollbar-track {
+    background: #0a0e27;
+}
+
+.control-panel::-webkit-scrollbar-thumb {
+    background: #3a4558;
+    border-radius: 4px;
+}
+
+.control-panel::-webkit-scrollbar-thumb:hover {
+    background: #4a5568;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .main-content {
+        flex-direction: column;
+    }
+
+    .control-panel {
+        width: 100%;
+        max-height: 30vh;
+        border-right: none;
+        border-bottom: 2px solid #3a4558;
+    }
+
+    .display-area {
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 768px) {
+    header h1 {
+        font-size: 18px;
+    }
+
+    .control-panel {
+        padding: 15px;
+    }
+
+    .display-area {
+        padding: 15px;
+        gap: 15px;
+    }
+
+    .preset-buttons {
+        grid-template-columns: 1fr;
+    }
+}
