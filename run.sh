@@ -10,4 +10,4 @@ echo "Access the web interface at: http://$(hostname -I | awk '{print $1}'):5000
 echo "Or locally at: http://localhost:5000"
 echo ""
 
-python3 backend/app.py
+python3 backend/main.py "$@"
