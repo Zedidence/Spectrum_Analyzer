@@ -5,13 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Spectrum Analyzer - BladeRF</title>
     <link rel="stylesheet" href="/static/css/style.css">
-    <!-- Socket.IO client from CDN -->
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>🔊 Spectrum Analyzer</h1>
+            <h1>Spectrum Analyzer</h1>
             <div class="connection-status" id="connection-status">
                 <span class="status-indicator" id="status-indicator"></span>
                 <span id="status-text">Connecting...</span>
@@ -25,8 +23,8 @@
 
                 <!-- Streaming Control -->
                 <div class="control-section">
-                    <button id="start-btn" class="btn btn-primary">▶ Start</button>
-                    <button id="stop-btn" class="btn btn-danger" disabled>⏹ Stop</button>
+                    <button id="start-btn" class="btn btn-primary">Start</button>
+                    <button id="stop-btn" class="btn btn-danger" disabled>Stop</button>
                 </div>
 
                 <!-- Frequency Control -->
@@ -34,10 +32,10 @@
                     <label for="frequency">Center Frequency (MHz)</label>
                     <input type="number" id="frequency" value="100" min="20" max="6000" step="0.1">
                     <div class="preset-buttons">
-                        <button class="btn-preset" data-freq="100">FM (100 MHz)</button>
-                        <button class="btn-preset" data-freq="433.92">ISM (433.92 MHz)</button>
-                        <button class="btn-preset" data-freq="915">ISM (915 MHz)</button>
-                        <button class="btn-preset" data-freq="2400">WiFi (2.4 GHz)</button>
+                        <button class="btn-preset" data-freq="100">FM 100 MHz</button>
+                        <button class="btn-preset" data-freq="433.92">ISM 433 MHz</button>
+                        <button class="btn-preset" data-freq="915">ISM 915 MHz</button>
+                        <button class="btn-preset" data-freq="2400">WiFi 2.4 GHz</button>
                     </div>
                 </div>
 
@@ -50,19 +48,123 @@
                         <option value="1000000">1 MHz</option>
                         <option value="2000000" selected>2 MHz</option>
                         <option value="5000000">5 MHz</option>
+                        <option value="10000000">10 MHz</option>
+                        <option value="20000000">20 MHz</option>
                     </select>
                 </div>
 
                 <!-- Gain Control -->
                 <div class="control-section">
-                    <label for="gain">Gain: <span id="gain-value">30</span> dB</label>
-                    <input type="range" id="gain" min="0" max="60" value="30" step="1">
+                    <label for="gain">Gain: <span id="gain-value">40</span> dB</label>
+                    <input type="range" id="gain" min="0" max="60" value="40" step="1">
+                </div>
+
+                <!-- Sample Rate Control -->
+                <div class="control-section">
+                    <label for="sample-rate-control">Sample Rate</label>
+                    <select id="sample-rate-control">
+                        <option value="1000000">1.0 MS/s</option>
+                        <option value="2000000" selected>2.0 MS/s</option>
+                        <option value="5000000">5.0 MS/s</option>
+                        <option value="10000000">10 MS/s</option>
+                        <option value="20000000">20 MS/s</option>
+                    </select>
+                </div>
+
+                <!-- FFT Size Control -->
+                <div class="control-section">
+                    <label for="fft-size-control">FFT Size</label>
+                    <select id="fft-size-control">
+                        <option value="512">512</option>
+                        <option value="1024">1024</option>
+                        <option value="2048" selected>2048</option>
+                        <option value="4096">4096</option>
+                        <option value="8192">8192</option>
+                    </select>
+                    <small class="control-hint">Stop streaming to change</small>
+                </div>
+
+                <!-- DSP Controls -->
+                <div class="control-section">
+                    <h3>DSP Settings</h3>
+
+                    <label for="window-type">Window Function</label>
+                    <select id="window-type">
+                        <option value="hanning">Hanning (-31 dB)</option>
+                        <option value="hamming">Hamming (-43 dB)</option>
+                        <option value="blackman">Blackman (-58 dB)</option>
+                        <option value="blackman-harris" selected>Blackman-Harris (-92 dB)</option>
+                        <option value="flat-top">Flat-top (best amplitude)</option>
+                        <option value="kaiser-6">Kaiser-6</option>
+                        <option value="kaiser-10">Kaiser-10</option>
+                        <option value="kaiser-14">Kaiser-14</option>
+                        <option value="rectangular">Rectangular (none)</option>
+                    </select>
+
+                    <label for="averaging-mode">Averaging</label>
+                    <select id="averaging-mode">
+                        <option value="none">None</option>
+                        <option value="exponential" selected>Exponential</option>
+                        <option value="linear">Linear</option>
+                    </select>
+
+                    <div id="averaging-alpha-group">
+                        <label for="averaging-alpha">Smoothing: <span id="averaging-alpha-value">0.3</span></label>
+                        <input type="range" id="averaging-alpha" min="0.05" max="0.95" value="0.3" step="0.05">
+                    </div>
+
+                    <div class="control-row">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="dc-removal" checked>
+                            DC Removal
+                        </label>
+                    </div>
+
+                    <div class="control-row">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="peak-hold-toggle">
+                            Peak Hold
+                        </label>
+                        <button id="peak-hold-reset" class="btn btn-small" disabled>Reset</button>
+                    </div>
+                </div>
+
+                <!-- Display Settings -->
+                <div class="control-section">
+                    <h3>Display</h3>
+
+                    <label for="colormap-select">Waterfall Colormap</label>
+                    <select id="colormap-select">
+                        <option value="viridis" selected>Viridis</option>
+                        <option value="plasma">Plasma</option>
+                        <option value="inferno">Inferno</option>
+                        <option value="turbo">Turbo</option>
+                        <option value="grayscale">Grayscale</option>
+                    </select>
+
+                    <div class="control-row" style="margin-top: 8px;">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="auto-scale-toggle">
+                            Auto-scale dB
+                        </label>
+                    </div>
+
+                    <div class="control-row">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="agc-toggle">
+                            Software AGC
+                        </label>
+                    </div>
                 </div>
 
                 <!-- Device Info -->
                 <div class="control-section">
                     <h3>Device Status</h3>
                     <div class="info-grid">
+                        <div class="info-item">
+                            <span class="info-label">BladeRF:</span>
+                            <span id="device-status">Checking...</span>
+                        </div>
                         <div class="info-item">
                             <span class="info-label">Sample Rate:</span>
                             <span id="sample-rate">--</span>
@@ -76,6 +178,7 @@
                             <span id="update-rate">--</span>
                         </div>
                     </div>
+                    <button id="check-device-btn" class="btn btn-secondary" style="margin-top: 8px; width: 100%;">Check Device</button>
                 </div>
             </aside>
 
@@ -88,9 +191,13 @@
                         <div class="display-info">
                             <span id="peak-freq">Peak: --</span>
                             <span id="peak-power">Power: --</span>
+                            <span id="zoom-info"></span>
                         </div>
                     </div>
-                    <canvas id="spectrum-canvas"></canvas>
+                    <div class="canvas-stack" id="spectrum-stack">
+                        <canvas id="spectrum-canvas"></canvas>
+                        <canvas id="spectrum-overlay" class="canvas-overlay"></canvas>
+                    </div>
                 </div>
 
                 <!-- Waterfall Display -->
@@ -107,13 +214,11 @@
         </div>
 
         <footer>
-            <p>Spectrum Analyzer for BladeRF | Running on Raspberry Pi 5 (DragonOS)</p>
+            <p>Spectrum Analyzer v2.0 | BladeRF 2.0 | FastAPI + WebGL</p>
         </footer>
     </div>
 
-    <!-- JavaScript modules -->
-    <script src="/static/js/spectrum.js"></script>
-    <script src="/static/js/waterfall.js"></script>
-    <script src="/static/js/app.js"></script>
+    <!-- Single ES6 module entry point (no Socket.IO dependency) -->
+    <script type="module" src="/static/js/main.js"></script>
 </body>
 </html>

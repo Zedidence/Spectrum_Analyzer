@@ -1,19 +1,20 @@
 # Spectrum Analyzer for BladeRF
 
-Web-based real-time spectrum analyzer with waterfall display for BladeRF SDR on Raspberry Pi 5 (DragonOS).
-
-![Spectrum Analyzer](docs/screenshots/main.png)
+Web-based real-time spectrum analyzer with waterfall display for BladeRF 2.0 SDR on Raspberry Pi 5 (DragonOS).
 
 ## Features
 
-- **Real-time spectrum display** with GPU-accelerated Canvas rendering
-- **Scrolling waterfall display** with 500-line history
-- **Wide frequency coverage**: 20 MHz - 6 GHz
-- **Tunable bandwidth**: 200 kHz - 5 MHz
+- **Real-time spectrum display** with zoom, pan, and auto-scaling
+- **WebGL-accelerated waterfall** with multiple colormaps (viridis, plasma, inferno, turbo, grayscale)
+- **Interactive markers** - normal, delta, and peak search
+- **Peak hold trace** with configurable decay
+- **Software AGC** - automatic gain control with hysteresis
+- **Advanced DSP** - overlap-save FFT, multiple window functions, DC removal, peak-preserving downsampling
+- **Wide frequency coverage**: 47 MHz - 6 GHz
+- **Tunable bandwidth**: 1 - 61.44 MHz
+- **Binary WebSocket protocol** for low-latency data transfer
+- **Keyboard shortcuts** for frequency tuning and analysis
 - **Remote access**: Access from any device on your network
-- **Keyboard shortcuts** for quick frequency tuning
-- **ARM NEON optimized** FFT processing using FFTW3
-- **Responsive design**: Works on desktop, tablet, and mobile
 
 ## Requirements
 
@@ -24,9 +25,8 @@ Web-based real-time spectrum analyzer with waterfall display for BladeRF SDR on 
 
 ### Software
 All dependencies are listed in [requirements.txt](requirements.txt):
-- Python 3.13+
-- Flask 3.0+
-- Flask-SocketIO 5.3+
+- Python 3.11+
+- FastAPI + uvicorn (async web framework)
 - NumPy, SciPy
 - pyFFTW (FFTW3 Python wrapper)
 - GNU Radio 3.10+ with gr-osmosdr
@@ -45,7 +45,7 @@ pip3 install -r requirements.txt
 Check that BladeRF is detected:
 
 ```bash
-bladeRF-cli -i
+bladeRF-cli -p
 ```
 
 You should see your BladeRF device information.
@@ -55,13 +55,16 @@ You should see your BladeRF device information.
 ### Start the Application
 
 ```bash
-./run.sh
+python3 backend/main.py
 ```
 
-Or directly:
+With options:
 
 ```bash
-python3 backend/app.py
+python3 backend/main.py --debug                    # Debug logging
+python3 backend/main.py --port 8080                # Custom port
+python3 backend/main.py --sample-rate 5e6           # 5 MS/s
+python3 backend/main.py --fft-size 4096             # Higher resolution
 ```
 
 ### Access the Web Interface
@@ -70,165 +73,175 @@ Open a web browser and navigate to:
 - **Local access**: http://localhost:5000
 - **Network access**: http://[raspberry-pi-ip]:5000
 
-For example: `http://192.168.1.100:5000`
-
 ### Controls
 
 #### Starting/Stopping
-- Click **▶ Start** to begin streaming
-- Click **⏹ Stop** to stop streaming
+- Click **Start** to begin streaming
+- Click **Stop** to stop streaming
 
 #### Frequency Tuning
-- **Manual entry**: Enter frequency in MHz (20 - 6000 MHz)
+- **Manual entry**: Enter frequency in MHz (47 - 6000 MHz)
 - **Preset buttons**: Quick access to common frequencies
   - FM Radio (100 MHz)
   - ISM Band (433.92 MHz)
   - ISM Band (915 MHz)
   - WiFi (2.4 GHz)
-- **Keyboard shortcuts**:
-  - `↑` / `↓`: Adjust frequency by ±1 MHz
-  - `←` / `→`: Adjust frequency by ±0.1 MHz
-  - `Space`: Toggle streaming on/off
 
-#### Other Controls
-- **Bandwidth**: Select from 200 kHz to 5 MHz
-- **Gain**: Adjust RX gain from 0 to 60 dB using slider
+#### DSP Settings
+- **Window function**: Hanning, Blackman-Harris (default), Blackman, Flat-top, Kaiser, Rectangular
+- **Averaging**: None, linear, or exponential with adjustable alpha
+- **DC removal**: IIR high-pass filter to remove DC offset
+- **Peak hold**: Track maximum signal levels over time
+
+#### Display Settings
+- **Colormap**: Viridis, Plasma, Inferno, Turbo, Grayscale
+- **Auto-scale**: Automatic dB range adjustment
+- **AGC**: Software automatic gain control
+
+#### Keyboard Shortcuts
+| Key | Action |
+|-----|--------|
+| `M` | Add marker at peak |
+| `N` | Next peak search |
+| `D` | Add delta marker |
+| `C` | Clear all markers |
+| `H` | Toggle peak hold |
+| `R` | Reset zoom |
+| `A` | Toggle auto-scale |
+| `+`/`-` | Adjust dB range |
+
+#### Mouse Controls
+- **Scroll wheel**: Zoom in/out (centered on cursor)
+- **Click + drag**: Pan across spectrum
+- **Double-click**: Reset zoom to full span
 
 ## Architecture
 
-### Backend (Python/Flask)
+### Backend (Python/FastAPI)
 ```
 backend/
-├── app.py                  # Flask server with WebSocket
-├── bladerf_interface.py    # BladeRF control via gr-osmosdr
-└── signal_processor.py     # FFT and power spectrum calculation
+├── main.py                     # Entry point: argparse + uvicorn
+├── app.py                      # FastAPI factory with async lifespan
+├── config.py                   # Dataclass-based configuration
+├── logging_config.py           # Centralized logging with file rotation
+├── api/
+│   ├── routes.py               # REST: /api/status, /api/check_device, /api/reconnect
+│   └── websocket.py            # Native WebSocket: /ws (binary data out, text commands in)
+├── hardware/
+│   ├── bladerf_interface.py    # BladeRF control via gr-osmosdr (dedicated thread)
+│   └── probe.py                # Device probing
+├── dsp/
+│   ├── pipeline.py             # FFT pipeline: window, FFT, power spectrum, averaging
+│   ├── windows.py              # Window functions with correction factors
+│   ├── dc_removal.py           # IIR high-pass DC removal
+│   ├── downsampler.py          # Peak-preserving decimation
+│   └── agc.py                  # Software automatic gain control
+└── streaming/
+    ├── manager.py              # StreamManager: coordinates 3 threads + queues
+    └── protocol.py             # Binary packet encoder (v2 protocol)
 ```
 
-### Frontend (HTML/JavaScript)
+### Frontend (ES6 Modules)
 ```
 static/
-├── index.html              # Main web page
-├── css/style.css           # Styling
+├── index.html                  # Main page (single <script type="module">)
+├── css/style.css               # Styling
 └── js/
-    ├── app.js              # WebSocket client and control logic
-    ├── spectrum.js         # Spectrum display (Canvas 2D)
-    └── waterfall.js        # Waterfall display (Canvas 2D)
+    ├── main.js                 # Entry point: init, render loop, state wiring
+    ├── modules/
+    │   ├── connection.js       # Native WebSocket with auto-reconnect
+    │   ├── protocol.js         # Binary packet parser (DataView-based)
+    │   ├── state.js            # Reactive state store with change listeners
+    │   ├── controls.js         # UI control bindings
+    │   └── keyboard.js         # Keyboard shortcuts
+    ├── rendering/
+    │   ├── spectrum-renderer.js  # Canvas 2D spectrum with zoom support
+    │   ├── waterfall-renderer.js # WebGL waterfall with ring buffer
+    │   ├── grid-overlay.js       # Canvas overlay: grid, labels, markers
+    │   ├── zoom-controller.js    # Mouse wheel zoom, drag pan
+    │   └── colormap.js           # Colormap generation (viridis, plasma, etc.)
+    └── analysis/
+        └── markers.js          # Normal/delta markers, peak search
 ```
+
+### Threading Model
+```
+[GNU Radio Thread]          [DSP Thread]              [asyncio Main Thread]
+  BladeRF osmosdr             FFT + windowing           FastAPI + WebSocket
+  DataSink block              DC removal, averaging     HTTP routes, broadcast
+       |                           |                          |
+       +--- threading.Queue -------+--- loop.call_soon -------+
+            (native threads)        threadsafe()
+                                    (asyncio.Queue)
+```
+
+This design avoids the eventlet monkey-patching issue that caused deadlocks with GNU Radio's native C++ pthreads.
 
 ## Performance
 
 ### Typical Performance on Raspberry Pi 5
-- **FFT Update Rate**: 10-20 Hz
-- **CPU Usage**: 30-40% (single core)
+- **Update Rate**: 30-60 FPS
+- **CPU Usage**: <50%
 - **Memory**: ~200 MB
-- **Latency**: <200ms from RF to display
+- **Latency**: <100ms from RF to display
 
-### Optimization Tips
-- Use smaller FFT sizes (1024-2048) for higher update rates
-- Reduce bandwidth for lower CPU usage
-- Lower gain to reduce signal processing load
-- Close other applications to free resources
+### Configuration Tips
+- Use `--fft-size 1024` for higher update rates at lower resolution
+- Use `--fft-size 4096` for higher frequency resolution
+- Use `--sample-rate 1e6` for lower CPU usage
+- Blackman-Harris window (default) gives -92 dB sidelobes
 
 ## Troubleshooting
 
-### BladeRF Not Detected
+See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for detailed guidance.
+
+### Quick Checks
 ```bash
 # Check USB connection
 lsusb | grep Nuand
 
-# Verify device with bladeRF-cli
+# Verify device
 bladeRF-cli -p
 
-# Check udev rules
-ls /usr/lib/udev/rules.d/ | grep bladerf
+# Check firewall
+sudo ufw allow 5000
 ```
 
-### WebSocket Connection Issues
-- Ensure Flask server is running
-- Check firewall rules: `sudo ufw allow 5000`
-- Verify network connectivity
+## Logging
 
-### Low Frame Rate
-- Reduce FFT size in [backend/app.py](backend/app.py#L35)
-- Lower bandwidth setting
-- Reduce averaging factor in signal processor
+See [LOGGING.md](LOGGING.md) for detailed logging configuration.
 
-## Development
-
-### Project Structure
+Log files are written to `logs/`:
 ```
-Spectrum_Analyzer/
-├── backend/            # Python backend
-├── static/             # Web frontend
-│   ├── css/
-│   ├── js/
-│   └── img/
-├── config/             # Configuration files
-├── tests/              # Unit tests
-├── docs/               # Documentation
-├── requirements.txt    # Python dependencies
-├── run.sh              # Launch script
-└── README.md           # This file
+logs/
+├── app.log           # Main application log (INFO+)
+├── error.log         # Errors only (ERROR+)
+├── debug.log         # Full debug output (DEBUG+)
+├── hardware/
+│   └── bladerf.log   # BladeRF hardware operations
+└── streaming/
+    └── stream.log    # Streaming and processing
 ```
-
-### Running Tests
-```bash
-python3 -m pytest tests/
-```
-
-### Adding Features
-1. Backend changes: Modify files in [backend/](backend/)
-2. Frontend changes: Modify files in [static/](static/)
-3. No compilation needed - changes take effect immediately
-
-## API Documentation
-
-### WebSocket Events
-
-**Client → Server**:
-- `start_streaming` - Start FFT data stream
-- `stop_streaming` - Stop data stream
-- `set_frequency` - Set center frequency (Hz)
-- `set_gain` - Set RX gain (dB)
-- `set_bandwidth` - Set bandwidth (Hz)
-- `get_status` - Request device status
-
-**Server → Client**:
-- `fft_data` - FFT spectrum data (array of dB values)
-- `status_update` - Device status update
-- `connected` - Connection confirmation
-- `error` - Error message
-
-### REST API
-
-- `GET /api/status` - Get current device status
 
 ## License
 
 MIT License - see LICENSE file for details
-
-## Contributing
-
-Contributions welcome! Please:
-1. Fork the repository
-2. Create a feature branch
-3. Submit a pull request
 
 ## Credits
 
 - Built for DragonOS on Raspberry Pi 5
 - Uses BladeRF SDR from Nuand
 - Powered by GNU Radio and gr-osmosdr
-- FFT processing with FFTW3 (ARM NEON optimized)
+- FFT processing with FFTW3 via pyFFTW
 
 ## Support
 
 For issues and questions:
-- Check [troubleshooting](#troubleshooting) section
+- Check [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 - Review BladeRF documentation: https://www.nuand.com
 - GNU Radio resources: https://www.gnuradio.org
 
 ---
 
-**Version**: 1.0.0
-**Last Updated**: 2026-02-04
+**Version**: 2.0.0
+**Last Updated**: 2026-02-10

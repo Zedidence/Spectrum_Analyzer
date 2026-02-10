@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+logs/app.log
+logs/debug.log
+logs/error.log
+logs/hardware/
+logs/streaming/

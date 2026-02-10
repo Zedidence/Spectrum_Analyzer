@@ -1,6 +1,6 @@
 # Troubleshooting Guide
 
-This guide helps diagnose and fix common issues with the Spectrum Analyzer.
+This guide helps diagnose and fix common issues with the Spectrum Analyzer v2.0.
 
 ## Table of Contents
 - [No Visual Display](#no-visual-display)
@@ -15,51 +15,52 @@ This guide helps diagnose and fix common issues with the Spectrum Analyzer.
 
 ### Symptoms
 - Blank spectrum/waterfall displays
-- "Waiting for data..." message persists
-- No error messages
+- No data flowing after clicking Start
 
 ### Diagnosis Steps
 
-#### 1. Check Browser Console
-Open browser developer console (F12) and look for:
+#### 1. Check Browser Console (F12)
 
 **Good signs:**
 ```
-✓ WebSocket connected successfully
-✓ First FFT data packet received!
-✓ SpectrumDisplay: First data received
-✓ WaterfallDisplay: First line added
+[Connection] WebSocket connected
+[Protocol] Frame received, type=1, 8256 bytes
 ```
 
 **Bad signs:**
 ```
-⚠ Data timeout #X - no IQ samples received
-✗ Queue is empty - no data being received!
-✗ WebSocket disconnected
+WebSocket connection failed
+WebSocket closed unexpectedly
 ```
 
 #### 2. Check Backend Logs
-Look at the server terminal output for:
+
+```bash
+# Watch main log
+tail -f logs/app.log
+
+# Or run with debug
+python3 backend/main.py --debug
+```
 
 **Good flow:**
 ```
-✓ BladeRF setup complete - ready to stream
-✓ Flowgraph running - data should be flowing
-✓ First IQ data received - processing pipeline active
-📊 Stats: Update rate = 15.0 Hz
+Starting stream: 100.0 MHz, 2.0 MS/s, gain 40.0 dB
+GNU Radio flowgraph started
+DSP thread started
+Broadcast loop started
 ```
 
 **Problem indicators:**
 ```
-✗ Failed to setup BladeRF
-⚠ Queue is empty - no data being received!
-⚠ Data timeout - no IQ samples received
+Failed to initialize BladeRF
+IQ queue full, dropping data
+DSP thread error
 ```
 
 ### Common Causes & Solutions
 
 #### Cause 1: BladeRF Not Connected
-**Symptoms:** Backend shows "Failed to setup BladeRF"
 
 **Solution:**
 ```bash
@@ -72,79 +73,63 @@ bladeRF-cli -p
 # Check permissions
 ls -l /dev/bus/usb/*/$(lsusb | grep Nuand | awk '{print $4}' | tr -d ':')
 
-# If permission denied, add user to plugdev group
+# If permission denied
 sudo usermod -a -G plugdev $USER
-# Then logout and login again
+# Logout and login again
 ```
 
-#### Cause 2: GNU Radio Flowgraph Not Starting
-**Symptoms:** Backend shows "Flowgraph started" but queue remains empty
+#### Cause 2: GNU Radio Not Starting
 
 **Solution:**
 ```bash
-# Test BladeRF with simple GNU Radio script
+# Test BladeRF with GNU Radio directly
 python3 -c "
 from osmosdr import source
 from gnuradio import gr
 
 tb = gr.top_block()
 src = source('bladerf=0')
-src.set_sample_rate(2.4e6)
+src.set_sample_rate(2e6)
 src.set_center_freq(100e6)
 print('BladeRF source created successfully')
 "
 ```
 
-#### Cause 3: Incorrect Sample Rate
-**Symptoms:** Backend runs but no data flows
-
-**Solution:** Edit `backend/app.py` and adjust sample rate:
-```python
-# Try different sample rates
-sample_rate = 1e6    # 1 MS/s (conservative)
-sample_rate = 2e6    # 2 MS/s
-sample_rate = 2.4e6  # 2.4 MS/s (default)
-```
-
-#### Cause 4: Canvas Not Rendering
-**Symptoms:** Data is received but displays are blank
+#### Cause 3: Dependencies Missing
 
 **Solution:**
-```javascript
-// Check browser console for canvas errors
-// Verify canvas elements exist:
-console.log(document.getElementById('spectrum-canvas'));
-console.log(document.getElementById('waterfall-canvas'));
+```bash
+pip3 install -r requirements.txt
 
-// Should output: <canvas id="..."> elements, not null
+# Verify key imports
+python3 -c "import fastapi, uvicorn, numpy, scipy, pyfftw; print('All imports OK')"
 ```
+
+#### Cause 4: WebGL Context Lost
+
+**Symptoms:** Waterfall stops updating, spectrum still works
+
+**Solution:** Refresh the browser page. WebGL context loss recovery is built in, but a refresh guarantees a clean state.
 
 ---
 
 ## Connection Issues
 
-### WebSocket Disconnects Briefly
+### WebSocket Won't Connect
 
-**Symptoms:** Connection indicator flickers, brief disconnection messages
+**Symptoms:** Browser shows connection error, no data
 
-**Causes:**
-1. Network latency or congestion
-2. Browser tab inactive (Chrome throttling)
-3. Server overload
+**Check server is running:**
+```bash
+# Verify the process
+ps aux | grep main.py
 
-**Solutions:**
-```javascript
-// Increase reconnection attempts in static/js/app.js
-socket = io({
-    reconnection: true,
-    reconnectionDelay: 1000,
-    reconnectionAttempts: 20  // Increased from 10
-});
+# Check the port
+ss -tlnp | grep 5000
+# Should show: 0.0.0.0:5000 (listening on all interfaces)
 ```
 
 ### Cannot Connect from Remote Device
-
-**Symptoms:** Works on localhost but not from other devices
 
 **Solutions:**
 ```bash
@@ -152,15 +137,24 @@ socket = io({
 sudo ufw status
 sudo ufw allow 5000
 
-# 2. Verify server is listening on all interfaces
-netstat -tulpn | grep 5000
-# Should show: 0.0.0.0:5000 (not 127.0.0.1:5000)
-
-# 3. Get Raspberry Pi IP address
+# 2. Get Raspberry Pi IP
 hostname -I
 
-# 4. Try accessing from remote device:
+# 3. Access from remote device:
 # http://[raspberry-pi-ip]:5000
+```
+
+### WebSocket Disconnects Frequently
+
+**Possible causes:**
+1. Network latency or congestion
+2. Browser tab inactive (Chrome throttles background tabs)
+3. Server overloaded
+
+The WebSocket client has built-in auto-reconnect. If disconnects are frequent, check:
+```bash
+# Monitor connection log
+tail -f logs/streaming/stream.log | grep -i "websocket\|connect\|disconnect"
 ```
 
 ---
@@ -169,29 +163,28 @@ hostname -I
 
 ### Device Not Detected
 
-**Check USB Connection:**
 ```bash
 # Verify BladeRF appears in USB devices
 lsusb | grep -i nuand
+# Expected: Bus 002 Device 003: ID 2cf0:5250 Nuand LLC bladeRF 2.0 micro
 
-# Expected output:
-# Bus 002 Device 003: ID 2cf0:5250 Nuand LLC bladeRF 2.0 micro
+# Probe with bladeRF-cli
+bladeRF-cli -p
 ```
 
 ### Device Opens But No Data
 
-**Check Firmware:**
+**Check firmware:**
 ```bash
 bladeRF-cli -i
-# Look for firmware version in output
-# Should be 2.6.0 or newer
+# Look for firmware version - should be 2.6.0 or newer
 ```
 
 **Test with bladeRF-cli:**
 ```bash
 bladeRF-cli -i
 > set frequency rx 100M
-> set samplerate rx 2.4M
+> set samplerate rx 2M
 > set bandwidth rx 2M
 > set gain rx 40
 > rx config file=/tmp/test.sc16q11 format=bin n=100000
@@ -199,168 +192,172 @@ bladeRF-cli -i
 > rx wait
 > quit
 
-# Check if file was created
+# Check if file was created (~800 KB expected)
 ls -lh /tmp/test.sc16q11
-# Should be ~800 KB (400K IQ samples * 4 bytes)
 ```
 
-### Gain Too Low - No Signals Visible
+### No Signals Visible
 
-**Increase Gain:**
-- In web UI, move gain slider to 50-60 dB
-- Or edit `backend/bladerf_interface.py`:
-```python
-self.gain = 50  # Changed from 40
-```
+- Increase gain: use the gain slider in the UI (try 50-60 dB)
+- Check antenna is connected
+- Verify frequency range: BladeRF 2.0 covers 47 MHz - 6 GHz
+- Try FM radio at 88-108 MHz as a known signal source
 
 ---
 
 ## Performance Issues
 
-### Low Update Rate (<5 Hz)
+### Low Update Rate
 
 **Causes:**
-1. CPU overloaded
-2. FFT size too large
-3. Too much averaging
+1. FFT size too large
+2. Sample rate too high for CPU
+3. CPU overloaded by other processes
 
 **Solutions:**
-```python
-# In backend/app.py, reduce FFT size and averaging:
-fft_size = 1024      # Reduced from 2048
-averaging = 2        # Reduced from 4
+```bash
+# Reduce FFT size
+python3 backend/main.py --fft-size 1024
+
+# Reduce sample rate
+python3 backend/main.py --sample-rate 1e6
+
+# Check CPU usage
+htop
 ```
 
-### High CPU Usage (>80%)
+### High CPU Usage (>50%)
 
-**Solutions:**
-```python
-# Reduce sample rate in backend/app.py:
-sample_rate = 1e6    # 1 MS/s instead of 2.4 MS/s
-
-# Reduce update rate in backend/app.py:
-time.sleep(0.1)      # 10 Hz instead of 15 Hz
+```bash
+# Lower settings
+python3 backend/main.py --fft-size 1024 --sample-rate 1e6
 ```
+
+Also in the UI:
+- Set averaging mode to "None" (fastest)
+- Disable DC removal if not needed
+- Disable peak hold if not needed
+
+### Queue Full Warnings
+
+```
+IQ queue full, dropping data
+```
+
+This means the DSP thread can't process data as fast as it arrives. Solutions:
+1. Reduce FFT size (fewer bins to compute)
+2. Reduce sample rate (less data per second)
+3. Set averaging to "None" mode
+4. Close other CPU-intensive applications
 
 ### Waterfall Stuttering
 
-**Solutions:**
-```javascript
-// Reduce waterfall history in static/js/app.js:
-waterfallDisplay = new WaterfallDisplay('waterfall-canvas', 250);
-// Reduced from 500 lines
-```
+- Ensure WebGL is enabled in your browser
+- Close other GPU-intensive applications
+- Try reducing the browser window size
 
 ---
 
 ## Debugging Tools
 
-### Enable Maximum Logging
+### Enable Debug Logging
 
-**Backend:**
-```python
-# In backend/app.py and backend/bladerf_interface.py
-# Already set to DEBUG level
-
-# View logs:
-python3 backend/app.py 2>&1 | tee debug.log
+```bash
+python3 backend/main.py --debug
 ```
 
-**Frontend:**
-```javascript
-// Browser console (F12) automatically shows all logs
-// Filter by severity:
-// - Green: console.log (info)
-// - Yellow: console.warn (warnings)
-// - Red: console.error (errors)
+This enables verbose output for all components. Check specific log files:
+```bash
+tail -f logs/debug.log           # Everything
+tail -f logs/hardware/bladerf.log  # Hardware + DSP
+tail -f logs/streaming/stream.log  # Streaming + WebSocket
 ```
 
 ### Test Components Individually
 
 **Test 1: BladeRF Hardware**
 ```bash
-bladeRF-cli -p  # Probe device
+bladeRF-cli -p
 ```
 
 **Test 2: Python Imports**
 ```bash
 python3 -c "
-from backend.bladerf_interface import BladeRFInterface
-from backend.signal_processor import SignalProcessor
-print('✓ Imports successful')
+import sys; sys.path.insert(0, 'backend')
+from config import Config
+from hardware.bladerf_interface import BladeRFInterface
+from dsp.pipeline import DSPPipeline
+from streaming.manager import StreamManager
+print('All imports successful')
 "
 ```
 
-**Test 3: FFT Processing**
+**Test 3: FastAPI App Creation**
 ```bash
 python3 -c "
-import numpy as np
-from backend.signal_processor import SignalProcessor
-
-proc = SignalProcessor(fft_size=2048, sample_rate=2.4e6)
-iq = np.random.randn(2048) + 1j * np.random.randn(2048)
-spectrum = proc.process_iq_samples(iq)
-print(f'✓ FFT processing works: {len(spectrum)} bins')
+import sys; sys.path.insert(0, 'backend')
+from config import Config
+from app import create_app
+app = create_app(Config())
+print('FastAPI app created successfully')
+print('Routes:', [r.path for r in app.routes])
 "
 ```
 
-### Check Browser Compatibility
+### Browser Compatibility
 
-**Recommended Browsers:**
-- Chrome/Chromium 90+
+**Recommended:**
+- Chrome/Chromium 90+ (best WebGL performance)
 - Firefox 88+
-- Safari 14+ (macOS/iOS)
+- Safari 14+
 
-**Known Issues:**
-- Internet Explorer: Not supported
-- Old Android browsers: May have Canvas performance issues
+**Required features:**
+- WebGL 1.0 (waterfall display)
+- ES6 modules (frontend code)
+- Native WebSocket (data connection)
 
 ### Monitor System Resources
 
 ```bash
-# CPU usage
+# CPU and memory usage
 htop
 
-# Memory usage
-free -h
-
-# USB bandwidth (if using external tool)
+# USB bandwidth
 lsusb -t
+
+# Disk space (for logs)
+df -h
+du -sh logs/
 ```
 
 ---
 
 ## Getting Help
 
-If problems persist after trying these solutions:
+If problems persist:
 
 1. **Collect Logs:**
    ```bash
    # Backend logs
-   python3 backend/app.py 2>&1 | tee backend.log
+   python3 backend/main.py --debug 2>&1 | tee backend_debug.log
 
-   # Browser console logs (F12, save as file)
+   # Or check existing logs
+   ls -la logs/ logs/hardware/ logs/streaming/
    ```
 
 2. **System Info:**
    ```bash
-   # OS version
    cat /etc/os-release
-
-   # Python version
    python3 --version
-
-   # GNU Radio version
    gnuradio-config-info --version
-
-   # BladeRF firmware
-   bladeRF-cli -i
+   bladeRF-cli -p
+   pip3 list | grep -E "fastapi|uvicorn|numpy|scipy|pyfftw"
    ```
 
 3. **Create Issue:**
-   - Include logs (backend.log and browser console)
+   - Include logs (debug.log and browser console)
    - Include system info
-   - Describe what you expected vs what happened
+   - Describe expected vs actual behavior
    - Steps to reproduce
 
 ---
@@ -371,14 +368,14 @@ Before reporting an issue, verify:
 
 - [ ] BladeRF detected: `lsusb | grep Nuand` shows device
 - [ ] Permissions OK: `bladeRF-cli -p` works without sudo
-- [ ] Backend starts: No errors when running `python3 backend/app.py`
-- [ ] Browser console: No red errors (open with F12)
+- [ ] Dependencies installed: `pip3 install -r requirements.txt`
+- [ ] Server starts: `python3 backend/main.py` shows no errors
+- [ ] Browser console: No red errors (F12)
 - [ ] Firewall open: `sudo ufw allow 5000` if accessing remotely
 - [ ] Gain sufficient: Try 50-60 dB if no signals visible
-- [ ] Frequency correct: 88-108 MHz for FM radio, 2400 MHz for WiFi
 - [ ] Antenna connected: Check physical connections
 
 ---
 
-**Version:** 1.0.1
-**Last Updated:** 2026-02-04
+**Version**: 2.0.0
+**Last Updated**: 2026-02-10

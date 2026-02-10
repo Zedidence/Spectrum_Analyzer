@@ -1,339 +1,104 @@
-# Changelog - Bug Fixes and Improvements
+# Changelog
+
+## Version 2.0.0 - 2026-02-10
+
+### Complete Architecture Rebuild
+
+v2.0 is a ground-up rewrite addressing the fundamental architectural flaw in v1: **eventlet monkey-patches Python's threading primitives, but GNU Radio uses native C++ pthreads**, causing deadlocks under load, silent data drops, and race conditions.
+
+### Architecture Changes
+
+| Component | v1 | v2 |
+|-----------|-----|-----|
+| Web framework | Flask + eventlet | FastAPI + uvicorn (native asyncio) |
+| WebSocket | Socket.IO (JSON) | Native WebSocket (binary frames) |
+| Threading | Eventlet greenlets + real threads (conflict) | 3 isolated threads with queue bridges |
+| DSP | Hanning-only, no overlap, mean decimation | Multi-window, overlap-save, peak-preserving |
+| Frontend modules | IIFE globals, load-order dependent | ES6 modules with explicit imports |
+| Spectrum renderer | Canvas 2D (basic) | Canvas 2D with zoom/pan/markers |
+| Waterfall renderer | WebGL ring buffer | WebGL ring buffer + multiple colormaps |
+| State management | Global object | Reactive store with change listeners |
+
+### New Features
+
+#### Backend
+- **FastAPI + uvicorn**: No monkey-patching, proper asyncio integration
+- **3-thread architecture**: GNU Radio thread, DSP thread, asyncio main thread connected by queues
+- **Binary WebSocket protocol v2**: 8-byte frame header + 56-byte spectrum header + Float32 data
+- **Overlap-save FFT**: 50% overlap for better spectral estimation
+- **Multiple window functions**: Hanning, Blackman-Harris (default, -92 dB sidelobes), Blackman, Flat-top, Kaiser (6/10/14), Rectangular
+- **DC removal**: IIR high-pass filter via scipy.signal.lfilter
+- **Peak-preserving downsampling**: np.max() per bin group (signals don't disappear)
+- **Peak hold trace**: Element-wise maximum tracking across frames
+- **Software AGC**: Target -20 dBFS, 6 dB hysteresis, 3 dB gain steps, 1s rate limiting
+- **Proper dBFS normalization**: Corrected for window gain and FFT size
+- **Centralized logging**: Rotating file handlers with component-specific log files
+- **Dataclass configuration**: Type-safe config with validation
+
+#### Frontend
+- **ES6 modules**: Clean dependency graph, no global state pollution
+- **Native WebSocket**: Auto-reconnect, binary frame parsing
+- **Reactive state store**: `.on(key, callback)` change notification
+- **Zoom and pan**: Mouse wheel zoom centered on cursor, click-drag pan, double-click reset
+- **Marker system**: Normal markers, delta markers, peak search with exclusion zones
+- **Grid overlay**: Separate canvas layer with frequency/dB labels that adapt to zoom level
+- **Auto-scale dB**: Smooth exponential approach to optimal range, snaps to 10 dB grid
+- **Multiple colormaps**: Viridis, Plasma, Inferno, Turbo, Grayscale (hot-swappable via WebGL texture)
+- **Keyboard shortcuts**: M (marker), N (next peak), D (delta), C (clear), H (peak hold), R (reset zoom), A (auto-scale), +/- (dB range)
+- **DSP controls**: Window type, averaging mode/alpha, DC removal, peak hold toggle
+
+### Files Removed (v1)
+- `backend/signal_processor.py` - replaced by `dsp/pipeline.py`
+- `backend/bladerf_interface.py` (root) - replaced by `hardware/bladerf_interface.py`
+- `backend/processing.py` - replaced by `streaming/manager.py`
+- `backend/state.py` - replaced by FastAPI `app.state`
+- `backend/routes.py` - replaced by `api/routes.py`
+- `backend/socketio_handlers.py` - replaced by `api/websocket.py`
+- `static/js/app.js` - replaced by `main.js`
+- `static/js/spectrum.js` - replaced by `rendering/spectrum-renderer.js`
+- `static/js/waterfall.js` - replaced by `rendering/waterfall-renderer.js`
+- `static/js/waterfall-webgl.js` - replaced by `rendering/waterfall-renderer.js`
+- `static/js/socket-handler.js` - replaced by `modules/connection.js`
+- `static/js/state.js` - replaced by `modules/state.js`
+- `static/js/ui-controller.js` - replaced by `modules/controls.js`
+
+### Breaking Changes
+- Flask + eventlet backend completely replaced by FastAPI + uvicorn
+- Socket.IO replaced by native WebSocket (binary protocol)
+- All frontend JavaScript rewritten as ES6 modules
+- Entry point changed from `backend/app.py` to `backend/main.py`
+- requirements.txt updated: flask/eventlet removed, fastapi/uvicorn added
+
+### Migration
+This is a full rewrite. No incremental migration path from v1 - replace all files.
+
+```bash
+pip3 install -r requirements.txt
+python3 backend/main.py
+```
+
+---
+
+## Version 1.0.3 - 2026-02-04
+
+### New Features
+- GUI controls for sample rate (0.5 - 10 MS/s) and FFT size (256 - 8192)
+- Settings adjustable from web interface without editing code
+
+---
+
+## Version 1.0.2 - 2026-02-04
+
+### Performance Optimizations
+- Removed artificial 50ms processing rate limit (reduced to 1ms)
+- Processing loop now drains queue as fast as data arrives
+
+---
 
 ## Version 1.0.1 - 2026-02-04
 
 ### Critical Bug Fixes
-
-#### 1. **Fixed No Visual Display Issue**
-**Problem:** Original code used `blocks.vector_sink_c` which doesn't work well for continuous streaming, causing no data to reach the display.
-
-**Solution:** Implemented custom `DataSink` GNU Radio block that properly captures IQ samples in real-time and puts them in a queue.
-
-**Files Modified:**
-- `backend/bladerf_interface.py`: Added `DataSink` class and rewrote streaming logic
-
-**Technical Details:**
-- Custom `gr.sync_block` with direct queue integration
-- Processes samples in FFT-sized chunks
-- Non-blocking queue operations to prevent backpressure
-
-#### 2. **Fixed Connection Stability**
-**Problem:** WebSocket connections were disconnecting briefly due to insufficient error handling and reconnection logic.
-
-**Solution:** Enhanced WebSocket configuration with better reconnection parameters and error handling.
-
-**Files Modified:**
-- `static/js/app.js`: Improved Socket.IO initialization with reconnection settings
-
----
-
-### Major Improvements
-
-#### 1. **Comprehensive Logging System**
-
-Added detailed logging throughout the entire application stack for easy troubleshooting.
-
-**Backend Logging (`backend/`)**:
-- Startup sequence with clear status indicators (✓, ✗, ⚠)
-- Device initialization steps with parameters
-- Real-time data flow monitoring
-- Performance statistics (update rate, queue size)
-- Detailed error messages with stack traces
-- Periodic health checks
-
-**Frontend Logging (`static/js/`)**:
-- Initialization sequence tracking
-- WebSocket connection state changes
-- Data packet reception confirmation
-- Rendering performance metrics
-- Canvas operation status
-
-**Features:**
-- Timestamped log entries
-- Log levels: DEBUG, INFO, WARNING, ERROR
-- Function name and line number tracking
-- Structured log format for easy parsing
-
-#### 2. **Enhanced Code Documentation**
-
-Added comprehensive inline comments explaining:
-- Purpose of each function/class
-- Parameter descriptions
-- Return value specifications
-- Usage examples
-- Architecture decisions
-
-**Files Enhanced:**
-- `backend/bladerf_interface.py`: Full docstrings and inline comments
-- `backend/app.py`: Detailed comments for WebSocket handlers
-- `backend/signal_processor.py`: Algorithm explanations
-- `static/js/*.js`: Function-level documentation
-
-#### 3. **Improved Error Handling**
-
-**Backend:**
-- Try-catch blocks with specific error messages
-- Graceful degradation on failures
-- Automatic recovery attempts
-- User-friendly error reporting via WebSocket
-
-**Frontend:**
-- Validation of received data
-- Fallback rendering for missing data
-- Connection loss recovery
-- Clear error messages to user
-
-#### 4. **Better Performance Monitoring**
-
-**Added Metrics:**
-- FFT update rate (Hz)
-- Data queue size
-- Timeout count
-- Error count
-- Frame render count
-- WebSocket packet count
-
-**Logging Intervals:**
-- Real-time critical events
-- 5-second performance summaries
-- 10-second canvas statistics
-- 100-packet milestones
-
----
-
-### Configuration Improvements
-
-#### 1. **Optimized Default Settings**
-
-Changed default gain from 30 dB to 40 dB for better signal visibility:
-```python
-# backend/bladerf_interface.py
-self.gain = 40  # Increased from 30 dB
-```
-
-Increased data queue size for better buffering:
-```python
-# backend/bladerf_interface.py
-self.data_queue = queue.Queue(maxsize=20)  # Increased from 10
-```
-
-#### 2. **Enhanced Status Reporting**
-
-Status updates now include:
-- Device parameters (frequency, gain, bandwidth)
-- Streaming state
-- FFT size and sample rate
-- Connection quality metrics
-
----
-
-### New Documentation
-
-#### 1. **TROUBLESHOOTING.md**
-Comprehensive troubleshooting guide covering:
-- No visual display
-- Connection issues
-- BladeRF problems
-- Performance issues
-- Debugging tools
-- Quick reference checklist
-
-#### 2. **Improved Code Comments**
-Added section headers and explanatory comments:
-```javascript
-// ============================================================================
-// WebSocket Management
-// ============================================================================
-```
-
----
-
-### Technical Improvements
-
-#### 1. **BladeRF Interface Rewrite**
-
-**Before:**
-- Used `blocks.vector_sink_c` (not suitable for continuous streaming)
-- Simple data polling with reset()
-- Minimal error checking
-
-**After:**
-- Custom `DataSink` GNU Radio block
-- Proper stream processing
-- Comprehensive error handling
-- Detailed logging at each step
-
-**Performance Impact:**
-- Reliable data flow
-- No dropped samples
-- Consistent update rates
-
-#### 2. **Signal Processing**
-
-**Enhancements:**
-- Validated FFT input/output
-- Added statistics computation
-- Periodic performance logging
-- Better averaging buffer management
-
-**Files Modified:**
-- `backend/signal_processor.py`
-
-#### 3. **WebSocket Communication**
-
-**Improvements:**
-- Structured event handlers
-- Better error reporting
-- Connection state management
-- Automatic reconnection
-
-**Files Modified:**
-- `backend/app.py`
-- `static/js/app.js`
-
----
-
-### Canvas Rendering Improvements
-
-#### 1. **Spectrum Display**
-
-**Enhancements:**
-- Added initialization logging
-- Performance tracking (frame count)
-- Data validation
-- Wait time tracking for "no data" state
-
-**Files Modified:**
-- `static/js/spectrum.js`
-
-#### 2. **Waterfall Display**
-
-**Enhancements:**
-- Added initialization logging
-- Line count tracking
-- Buffer milestone logging
-- Performance metrics
-
-**Files Modified:**
-- `static/js/waterfall.js`
-
----
-
-### Developer Experience Improvements
-
-#### 1. **Clearer Console Output**
-
-**Backend Terminal:**
-```
-════════════════════════════════════════════════════════════════════
-SPECTRUM ANALYZER BACKEND
-════════════════════════════════════════════════════════════════════
-✓ Hardware initialized successfully
-════════════════════════════════════════════════════════════════════
-Starting Flask + Socket.IO server
-  Local:   http://localhost:5000
-  Network: http://192.168.1.100:5000
-════════════════════════════════════════════════════════════════════
-```
-
-**Browser Console:**
-```
-════════════════════════════════════════════════════════════════════
-SPECTRUM ANALYZER - Frontend Initialization
-════════════════════════════════════════════════════════════════════
-Step 1: Creating spectrum display...
-✓ Spectrum display created
-Step 2: Creating waterfall display...
-✓ Waterfall display created
-════════════════════════════════════════════════════════════════════
-```
-
-#### 2. **Visual Status Indicators**
-
-- ✓ Success (green)
-- ✗ Error (red)
-- ⚠ Warning (yellow)
-- 📊 Statistics
-- 📈 Performance metrics
-
----
-
-### Testing & Validation
-
-Added test-friendly logging that helps identify:
-1. Where the signal flow stops
-2. Which component is causing issues
-3. Performance bottlenecks
-4. Configuration problems
-
----
-
-### Breaking Changes
-
-None - All changes are backward compatible.
-
----
-
-### Migration Guide
-
-No migration needed. Just pull the new code and restart the server.
-
-Optional: Clear browser cache to ensure new JavaScript is loaded:
-- Chrome: Ctrl+Shift+Del
-- Firefox: Ctrl+Shift+Del
-- Safari: Cmd+Option+E
-
----
-
-### Known Issues
-
-None currently. All reported issues have been fixed.
-
----
-
-### Future Improvements
-
-Potential enhancements for future versions:
-1. Binary WebSocket protocol for lower bandwidth
-2. Recording capability (IQ data capture)
-3. Signal measurements (bandwidth, power)
-4. Peak hold / max hold modes
-5. Multiple colormap options
-6. Adjustable averaging from UI
-7. Frequency bookmarks
-8. Auto-gain control (AGC)
-
----
-
-### Credits
-
-**Bug Reports:**
-- User feedback on visual display issues
-- Connection stability reports
-
-**Testing:**
-- Raspberry Pi 5 with DragonOS
-- BladeRF 2.0 micro
-- Multiple browsers (Chrome, Firefox, Safari)
-
----
-
-### Verification Checklist
-
-To verify fixes are working:
-
-- [ ] Backend starts without errors
-- [ ] Browser shows "Connected" status
-- [ ] Console shows "First FFT data packet received!"
-- [ ] Spectrum display shows real-time trace
-- [ ] Waterfall display shows scrolling lines
-- [ ] Update rate shows 10-15 Hz
-- [ ] Tune to FM radio (100 MHz) and see signals
-- [ ] Controls respond to user input
-- [ ] No red errors in console
-
----
-
-**Version:** 1.0.1
-**Date:** 2026-02-04
-**Status:** Stable
+- Fixed no visual display: replaced `blocks.vector_sink_c` with custom `DataSink` GNU Radio block
+- Fixed WebSocket connection stability with better reconnection handling
+- Added comprehensive logging system throughout the stack
+- Added TROUBLESHOOTING.md and LOGGING.md documentation

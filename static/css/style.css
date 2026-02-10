@@ -3,6 +3,72 @@
  * Dark theme optimized for signal visualization
  */
 
+/* ========================================
+   1. CSS Variables / Theme
+   ======================================== */
+
+:root {
+    /* Primary Colors */
+    --bg-primary: #0a0e27;
+    --bg-secondary: #151d2f;
+    --bg-tertiary: #1a2332;
+    --bg-gradient-start: #1a2332;
+    --bg-gradient-end: #2a3548;
+
+    /* Text Colors */
+    --text-primary: #e0e6ed;
+    --text-secondary: #a0b0c0;
+    --text-muted: #6a7a8a;
+
+    /* Accent Colors */
+    --accent-cyan: #00d9ff;
+    --accent-cyan-hover: #00b8e6;
+    --accent-green: #00ff88;
+    --accent-green-alt: #4ade80;
+    --accent-red: #ff4444;
+    --accent-red-hover: #e03333;
+    --accent-red-alt: #f87171;
+    --accent-yellow: #fbbf24;
+
+    /* Border Colors */
+    --border-primary: #3a4558;
+    --border-hover: #4a5568;
+
+    /* Sizing */
+    --border-radius-sm: 4px;
+    --border-radius-md: 5px;
+    --border-radius-lg: 6px;
+    --border-radius-xl: 8px;
+
+    /* Spacing */
+    --spacing-xs: 6px;
+    --spacing-sm: 8px;
+    --spacing-md: 12px;
+    --spacing-lg: 15px;
+    --spacing-xl: 20px;
+    --spacing-xxl: 30px;
+
+    /* Font Sizes */
+    --font-xs: 12px;
+    --font-sm: 13px;
+    --font-md: 14px;
+    --font-lg: 16px;
+    --font-xl: 18px;
+    --font-xxl: 24px;
+
+    /* Shadows */
+    --shadow-cyan: 0 4px 12px rgba(0, 217, 255, 0.4);
+    --shadow-red: 0 4px 12px rgba(255, 68, 68, 0.4);
+
+    /* Transitions */
+    --transition-fast: 0.2s ease;
+    --transition-normal: 0.3s ease;
+}
+
+/* ========================================
+   2. Base / Reset
+   ======================================== */
+
 * {
     margin: 0;
     padding: 0;
@@ -11,10 +77,14 @@
 
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #0a0e27;
-    color: #e0e6ed;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
     overflow: hidden;
 }
+
+/* ========================================
+   3. Layout (Container, Grid)
+   ======================================== */
 
 .container {
     display: flex;
@@ -22,27 +92,36 @@ body {
     height: 100vh;
 }
 
-/* Header */
+.main-content {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* ========================================
+   4. Header
+   ======================================== */
+
 header {
-    background: linear-gradient(135deg, #1a2332 0%, #2a3548 100%);
-    padding: 15px 30px;
-    border-bottom: 2px solid #3a4558;
+    background: linear-gradient(135deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
+    padding: var(--spacing-lg) var(--spacing-xxl);
+    border-bottom: 2px solid var(--border-primary);
     display: flex;
     justify-content: space-between;
     align-items: center;
 }
 
 header h1 {
-    font-size: 24px;
+    font-size: var(--font-xxl);
     font-weight: 600;
-    color: #00d9ff;
+    color: var(--accent-cyan);
 }
 
 .connection-status {
     display: flex;
     align-items: center;
     gap: 10px;
-    font-size: 14px;
+    font-size: var(--font-md);
 }
 
 .status-indicator {
@@ -54,11 +133,11 @@ header h1 {
 }
 
 .status-indicator.connected {
-    background-color: #00ff88;
+    background-color: var(--accent-green);
 }
 
 .status-indicator.disconnected {
-    background-color: #ff4444;
+    background-color: var(--accent-red);
 }
 
 @keyframes pulse {
@@ -66,26 +145,22 @@ header h1 {
     50% { opacity: 0.5; }
 }
 
-/* Main Content */
-.main-content {
-    display: flex;
-    flex: 1;
-    overflow: hidden;
-}
+/* ========================================
+   5. Control Panel (Left Sidebar)
+   ======================================== */
 
-/* Control Panel (Left Sidebar) */
 .control-panel {
     width: 300px;
-    background-color: #151d2f;
-    border-right: 2px solid #3a4558;
-    padding: 20px;
+    background-color: var(--bg-secondary);
+    border-right: 2px solid var(--border-primary);
+    padding: var(--spacing-xl);
     overflow-y: auto;
 }
 
 .control-panel h2 {
-    font-size: 18px;
-    margin-bottom: 20px;
-    color: #00d9ff;
+    font-size: var(--font-xl);
+    margin-bottom: var(--spacing-xl);
+    color: var(--accent-cyan);
 }
 
 .control-section {
@@ -94,33 +169,40 @@ header h1 {
 
 .control-section label {
     display: block;
-    margin-bottom: 8px;
-    font-size: 13px;
-    color: #a0b0c0;
+    margin-bottom: var(--spacing-sm);
+    font-size: var(--font-sm);
+    color: var(--text-secondary);
     font-weight: 500;
 }
 
+.control-section h3 {
+    font-size: var(--font-md);
+    color: var(--accent-cyan);
+    margin-bottom: var(--spacing-md);
+}
+
+/* Form Controls */
 .control-section input[type="number"],
 .control-section select {
     width: 100%;
     padding: 10px;
-    background-color: #1a2332;
-    border: 1px solid #3a4558;
-    border-radius: 5px;
-    color: #e0e6ed;
-    font-size: 14px;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--border-radius-md);
+    color: var(--text-primary);
+    font-size: var(--font-md);
 }
 
 .control-section input[type="number"]:focus,
 .control-section select:focus {
     outline: none;
-    border-color: #00d9ff;
+    border-color: var(--accent-cyan);
 }
 
 .control-section input[type="range"] {
     width: 100%;
     height: 6px;
-    background: #1a2332;
+    background: var(--bg-tertiary);
     border-radius: 3px;
     outline: none;
 }
@@ -130,7 +212,7 @@ header h1 {
     appearance: none;
     width: 18px;
     height: 18px;
-    background: #00d9ff;
+    background: var(--accent-cyan);
     border-radius: 50%;
     cursor: pointer;
 }
@@ -138,44 +220,111 @@ header h1 {
 .control-section input[type="range"]::-moz-range-thumb {
     width: 18px;
     height: 18px;
-    background: #00d9ff;
+    background: var(--accent-cyan);
     border-radius: 50%;
     cursor: pointer;
     border: none;
 }
 
-/* Buttons */
-.btn {
-    padding: 12px 20px;
+/* Control Hints */
+.control-hint {
+    color: var(--text-muted);
+    font-size: 0.8em;
+}
+
+/* Checkbox Controls */
+.control-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: var(--spacing-sm);
+}
+
+.checkbox-label {
+    display: flex !important;
+    align-items: center;
+    gap: var(--spacing-sm);
+    cursor: pointer;
+    margin-bottom: 0 !important;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--accent-cyan);
+    cursor: pointer;
+}
+
+.btn-small {
+    padding: 4px 10px;
     border: none;
-    border-radius: 6px;
-    font-size: 14px;
+    border-radius: var(--border-radius-sm);
+    font-size: var(--font-xs);
+    font-weight: 500;
+    cursor: pointer;
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    color: var(--text-secondary);
+    transition: all var(--transition-fast);
+}
+
+.btn-small:hover:not(:disabled) {
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
+}
+
+.btn-small:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* ========================================
+   6. Buttons
+   ======================================== */
+
+.btn {
+    padding: 12px var(--spacing-xl);
+    border: none;
+    border-radius: var(--border-radius-lg);
+    font-size: var(--font-md);
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: all var(--transition-normal);
     margin-right: 10px;
 }
 
 .btn-primary {
-    background-color: #00d9ff;
-    color: #0a0e27;
+    background-color: var(--accent-cyan);
+    color: var(--bg-primary);
 }
 
 .btn-primary:hover:not(:disabled) {
-    background-color: #00b8e6;
+    background-color: var(--accent-cyan-hover);
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 217, 255, 0.4);
+    box-shadow: var(--shadow-cyan);
 }
 
 .btn-danger {
-    background-color: #ff4444;
+    background-color: var(--accent-red);
     color: white;
 }
 
 .btn-danger:hover:not(:disabled) {
-    background-color: #e03333;
+    background-color: var(--accent-red-hover);
     transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(255, 68, 68, 0.4);
+    box-shadow: var(--shadow-red);
+}
+
+.btn-secondary {
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    color: var(--text-secondary);
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background-color: var(--bg-gradient-end);
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
 }
 
 .btn:disabled {
@@ -183,98 +332,112 @@ header h1 {
     cursor: not-allowed;
 }
 
+/* Preset Buttons */
 .preset-buttons {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    gap: var(--spacing-sm);
     margin-top: 10px;
 }
 
 .btn-preset {
-    padding: 8px;
-    background-color: #1a2332;
-    border: 1px solid #3a4558;
-    border-radius: 4px;
-    color: #a0b0c0;
-    font-size: 12px;
+    padding: var(--spacing-sm);
+    background-color: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--border-radius-sm);
+    color: var(--text-secondary);
+    font-size: var(--font-xs);
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all var(--transition-fast);
 }
 
 .btn-preset:hover {
-    background-color: #2a3548;
-    border-color: #00d9ff;
-    color: #00d9ff;
+    background-color: var(--bg-gradient-end);
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
 }
 
-/* Device Info */
-.control-section h3 {
-    font-size: 14px;
-    color: #00d9ff;
-    margin-bottom: 12px;
-}
+/* ========================================
+   7. Device Info & Status
+   ======================================== */
 
 .info-grid {
-    background-color: #1a2332;
-    border-radius: 6px;
-    padding: 12px;
+    background-color: var(--bg-tertiary);
+    border-radius: var(--border-radius-lg);
+    padding: var(--spacing-md);
 }
 
 .info-item {
     display: flex;
     justify-content: space-between;
-    padding: 6px 0;
-    font-size: 13px;
+    padding: var(--spacing-xs) 0;
+    font-size: var(--font-sm);
 }
 
 .info-label {
-    color: #a0b0c0;
+    color: var(--text-secondary);
 }
 
 .info-item span:last-child {
-    color: #00d9ff;
+    color: var(--accent-cyan);
     font-weight: 600;
 }
 
-/* Display Area (Right Side) */
+/* Device Status Colors (replaces inline styles) */
+.device-status-connected {
+    color: var(--accent-green-alt) !important;
+}
+
+.device-status-disconnected {
+    color: var(--accent-red-alt) !important;
+}
+
+.device-status-checking {
+    color: var(--accent-yellow) !important;
+}
+
+/* ========================================
+   8. Display Area (Right Side)
+   ======================================== */
+
 .display-area {
     flex: 1;
     display: flex;
     flex-direction: column;
-    padding: 20px;
-    gap: 20px;
+    padding: var(--spacing-xl);
+    gap: var(--spacing-xl);
     overflow: hidden;
 }
 
 .display-container {
     flex: 1;
-    background-color: #151d2f;
-    border-radius: 8px;
-    border: 2px solid #3a4558;
+    background-color: var(--bg-secondary);
+    border-radius: var(--border-radius-xl);
+    border: 2px solid var(--border-primary);
     display: flex;
     flex-direction: column;
     overflow: hidden;
 }
 
 .display-header {
-    padding: 12px 20px;
-    background-color: #1a2332;
-    border-bottom: 2px solid #3a4558;
+    padding: var(--spacing-md) var(--spacing-xl);
+    background-color: var(--bg-tertiary);
+    border-bottom: 2px solid var(--border-primary);
     display: flex;
     justify-content: space-between;
     align-items: center;
 }
 
 .display-header h3 {
-    font-size: 16px;
-    color: #00d9ff;
+    font-size: var(--font-lg);
+    color: var(--accent-cyan);
 }
 
 .display-info {
     display: flex;
-    gap: 20px;
-    font-size: 12px;
-    color: #a0b0c0;
+    gap: var(--spacing-xl);
+    font-size: var(--font-xs);
+    color: var(--text-secondary);
 }
 
 canvas {
@@ -283,35 +446,64 @@ canvas {
     height: 100%;
 }
 
-/* Footer */
-footer {
-    background-color: #151d2f;
-    border-top: 2px solid #3a4558;
-    padding: 12px 30px;
-    text-align: center;
-    font-size: 12px;
-    color: #6a7a8a;
+/* Stacked canvas layers (spectrum + overlay) */
+.canvas-stack {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
 }
 
-/* Scrollbar Styling */
+.canvas-stack canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.canvas-overlay {
+    pointer-events: none;
+    z-index: 1;
+}
+
+/* ========================================
+   9. Footer
+   ======================================== */
+
+footer {
+    background-color: var(--bg-secondary);
+    border-top: 2px solid var(--border-primary);
+    padding: var(--spacing-md) var(--spacing-xxl);
+    text-align: center;
+    font-size: var(--font-xs);
+    color: var(--text-muted);
+}
+
+/* ========================================
+   10. Scrollbar Styling
+   ======================================== */
+
 .control-panel::-webkit-scrollbar {
     width: 8px;
 }
 
 .control-panel::-webkit-scrollbar-track {
-    background: #0a0e27;
+    background: var(--bg-primary);
 }
 
 .control-panel::-webkit-scrollbar-thumb {
-    background: #3a4558;
-    border-radius: 4px;
+    background: var(--border-primary);
+    border-radius: var(--border-radius-sm);
 }
 
 .control-panel::-webkit-scrollbar-thumb:hover {
-    background: #4a5568;
+    background: var(--border-hover);
 }
 
-/* Responsive Design */
+/* ========================================
+   11. Responsive Design
+   ======================================== */
+
 @media (max-width: 1024px) {
     .main-content {
         flex-direction: column;
@@ -321,7 +513,7 @@ footer {
         width: 100%;
         max-height: 30vh;
         border-right: none;
-        border-bottom: 2px solid #3a4558;
+        border-bottom: 2px solid var(--border-primary);
     }
 
     .display-area {
@@ -331,16 +523,16 @@ footer {
 
 @media (max-width: 768px) {
     header h1 {
-        font-size: 18px;
+        font-size: var(--font-xl);
     }
 
     .control-panel {
-        padding: 15px;
+        padding: var(--spacing-lg);
     }
 
     .display-area {
-        padding: 15px;
-        gap: 15px;
+        padding: var(--spacing-lg);
+        gap: var(--spacing-lg);
     }
 
     .preset-buttons {

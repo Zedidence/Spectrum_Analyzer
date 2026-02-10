@@ -1,8 +1,13 @@
-# Web Framework and WebSocket Support
-flask>=3.0.0
-flask-socketio>=5.3.0
-python-socketio>=5.9.0
-eventlet>=0.33.0
+# Web Framework (v2: FastAPI replaces Flask + eventlet)
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+websockets>=12.0
+
+# Legacy (v1 only - can be removed after migration)
+# flask>=3.0.0
+# flask-socketio>=5.3.0
+# python-socketio>=5.9.0
+# eventlet>=0.33.0
 
 # Signal Processing
 numpy>=1.20.0
