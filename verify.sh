@@ -1,11 +1,11 @@
 #!/bin/bash
 #
-# Verification Script for Spectrum Analyzer
+# Verification Script for Spectrum Analyzer v2.0
 # Checks system requirements and configuration
 #
 
 echo "════════════════════════════════════════════════════════════════════"
-echo "SPECTRUM ANALYZER - System Verification"
+echo "SPECTRUM ANALYZER v2.0 - System Verification"
 echo "════════════════════════════════════════════════════════════════════"
 echo ""
 
@@ -48,14 +48,20 @@ print_status $? "bladeRF-cli can access device"
 # Check Python packages
 echo ""
 echo "Checking Python packages..."
-python3 -c "import flask" 2>/dev/null
-print_status $? "Flask installed"
+python3 -c "import fastapi" 2>/dev/null
+print_status $? "FastAPI installed"
 
-python3 -c "import flask_socketio" 2>/dev/null
-print_status $? "Flask-SocketIO installed"
+python3 -c "import uvicorn" 2>/dev/null
+print_status $? "uvicorn installed"
+
+python3 -c "import websockets" 2>/dev/null
+print_status $? "websockets installed"
 
 python3 -c "import numpy" 2>/dev/null
 print_status $? "NumPy installed"
+
+python3 -c "import scipy" 2>/dev/null
+print_status $? "SciPy installed"
 
 python3 -c "import pyfftw" 2>/dev/null
 print_status $? "pyFFTW installed"
@@ -71,20 +77,32 @@ echo ""
 echo "Checking project files..."
 cd "$(dirname "$0")"
 
+[ -f "backend/main.py" ]
+print_status $? "backend/main.py exists"
+
 [ -f "backend/app.py" ]
 print_status $? "backend/app.py exists"
 
-[ -f "backend/bladerf_interface.py" ]
-print_status $? "backend/bladerf_interface.py exists"
+[ -f "backend/config.py" ]
+print_status $? "backend/config.py exists"
 
-[ -f "backend/signal_processor.py" ]
-print_status $? "backend/signal_processor.py exists"
+[ -f "backend/hardware/bladerf_interface.py" ]
+print_status $? "backend/hardware/bladerf_interface.py exists"
+
+[ -f "backend/dsp/pipeline.py" ]
+print_status $? "backend/dsp/pipeline.py exists"
+
+[ -f "backend/streaming/manager.py" ]
+print_status $? "backend/streaming/manager.py exists"
+
+[ -f "backend/api/websocket.py" ]
+print_status $? "backend/api/websocket.py exists"
 
 [ -f "static/index.html" ]
 print_status $? "static/index.html exists"
 
-[ -f "static/js/app.js" ]
-print_status $? "static/js/app.js exists"
+[ -f "static/js/main.js" ]
+print_status $? "static/js/main.js exists"
 
 # Test imports
 echo ""
@@ -92,8 +110,11 @@ echo "Testing Python imports..."
 python3 -c "
 import sys
 sys.path.insert(0, 'backend')
-from bladerf_interface import BladeRFInterface
-from signal_processor import SignalProcessor
+from config import Config
+from hardware.bladerf_interface import BladeRFInterface
+from dsp.pipeline import DSPPipeline
+from streaming.manager import StreamManager
+from app import create_app
 print('✓ All Python modules import successfully')
 " 2>&1
 
@@ -109,8 +130,8 @@ echo "    Local:   http://localhost:5000"
 echo "    Network: http://$LOCAL_IP:5000"
 
 # Port check
-if command -v netstat &>/dev/null; then
-    if netstat -tulpn 2>/dev/null | grep -q ":5000 "; then
+if command -v ss &>/dev/null; then
+    if ss -tlnp 2>/dev/null | grep -q ":5000 "; then
         print_warning "Port 5000 is already in use"
     else
         echo "✓ Port 5000 is available"
@@ -127,7 +148,7 @@ if [ $ERRORS -eq 0 ]; then
     fi
     echo ""
     echo "Ready to start:"
-    echo "  ./run.sh"
+    echo "  python3 backend/main.py"
 else
     echo "✗ System verification failed with $ERRORS error(s)"
     echo ""
