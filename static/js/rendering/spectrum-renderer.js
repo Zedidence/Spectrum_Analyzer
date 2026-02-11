@@ -14,9 +14,9 @@ export class SpectrumRenderer {
         this._canvas = canvas;
         this._ctx = canvas.getContext('2d');
 
-        // Display parameters
-        this._dbMin = -80;
-        this._dbMax = 20;
+        // Display parameters — defaults tuned for BladeRF 2.0 typical output
+        this._dbMin = -100;
+        this._dbMax = -20;
         this._centerFreq = 100e6;
         this._sampleRate = 2e6;
 
@@ -25,10 +25,11 @@ export class SpectrumRenderer {
         this._viewEnd = 1;
 
         // Auto-scale state
-        this._autoScale = false;
-        this._targetDbMin = -80;
-        this._targetDbMax = 20;
+        this._autoScale = true;
+        this._targetDbMin = -100;
+        this._targetDbMax = -20;
         this._autoScaleAlpha = 0.05;
+        this._autoScaleFrames = 0;
 
         // Data
         this._spectrum = null;
@@ -120,7 +121,7 @@ export class SpectrumRenderer {
     }
 
     _updateAutoScale(spectrum, startBin, endBin) {
-        // Find min/max in visible region
+        // Find min/max in visible region (include both spectrum AND peak hold)
         let visMin = Infinity;
         let visMax = -Infinity;
         for (let i = startBin; i < endBin; i++) {
@@ -128,18 +129,29 @@ export class SpectrumRenderer {
             if (spectrum[i] > visMax) visMax = spectrum[i];
         }
 
+        // Include peak hold in range so the scale doesn't shift under it
+        if (this._peakHold) {
+            for (let i = startBin; i < endBin; i++) {
+                if (this._peakHold[i] > visMax) visMax = this._peakHold[i];
+                if (this._peakHold[i] < visMin) visMin = this._peakHold[i];
+            }
+        }
+
         // Add margins and snap to 10 dB grid
         const margin = 10;
         this._targetDbMin = Math.floor((visMin - margin) / 10) * 10;
         this._targetDbMax = Math.ceil((visMax + margin) / 10) * 10;
 
-        // Ensure minimum range
-        if (this._targetDbMax - this._targetDbMin < 30) {
-            this._targetDbMax = this._targetDbMin + 30;
+        // Ensure minimum range of 40 dB for useful display
+        if (this._targetDbMax - this._targetDbMin < 40) {
+            const center = (this._targetDbMax + this._targetDbMin) / 2;
+            this._targetDbMin = center - 20;
+            this._targetDbMax = center + 20;
         }
 
-        // Smooth approach
-        const a = this._autoScaleAlpha;
+        // Fast convergence for first few frames, then smooth tracking
+        this._autoScaleFrames++;
+        const a = this._autoScaleFrames <= 5 ? 0.5 : this._autoScaleAlpha;
         this._dbMin += a * (this._targetDbMin - this._dbMin);
         this._dbMax += a * (this._targetDbMax - this._dbMax);
     }
@@ -254,6 +266,9 @@ export class SpectrumRenderer {
     /** Enable/disable auto-scale. */
     setAutoScale(enabled) {
         this._autoScale = enabled;
+        if (enabled) {
+            this._autoScaleFrames = 0; // fast convergence on re-enable
+        }
     }
 
     get dbMin() { return this._dbMin; }

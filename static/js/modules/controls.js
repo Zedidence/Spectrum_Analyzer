@@ -48,6 +48,10 @@ export class Controls {
             colormapSelect: document.getElementById('colormap-select'),
             autoScaleToggle: document.getElementById('auto-scale-toggle'),
             agcToggle: document.getElementById('agc-toggle'),
+            // Info displays
+            rbwDisplay: document.getElementById('rbw-display'),
+            // Frequency step size
+            freqStep: document.getElementById('freq-step'),
         };
 
         this._setupControls();
@@ -202,14 +206,6 @@ export class Controls {
                     e.preventDefault();
                     this._adjustFrequency(-1);
                     break;
-                case 'ArrowRight':
-                    e.preventDefault();
-                    this._adjustFrequency(0.1);
-                    break;
-                case 'ArrowLeft':
-                    e.preventDefault();
-                    this._adjustFrequency(-0.1);
-                    break;
                 case ' ':
                     e.preventDefault();
                     if (this._state.get('streaming')) {
@@ -222,9 +218,11 @@ export class Controls {
         });
     }
 
-    _adjustFrequency(deltaMHz) {
+    _adjustFrequency(direction) {
         const el = this._els.frequency;
-        let freq = parseFloat(el.value) + deltaMHz;
+        const stepEl = this._els.freqStep;
+        const step = stepEl ? parseFloat(stepEl.value) : 1;
+        let freq = parseFloat(el.value) + direction * step;
         freq = Math.max(20, Math.min(6000, freq));
         el.value = freq.toFixed(3);
         this._conn.send('set_frequency', { value: freq * 1e6 });
@@ -240,15 +238,17 @@ export class Controls {
             els.statusText.textContent = connected ? 'Connected' : 'Disconnected';
         });
 
-        // Streaming status
+        // Streaming status — also disable FFT size while streaming
         this._state.on('streaming', (streaming) => {
             els.startBtn.disabled = streaming;
             els.stopBtn.disabled = !streaming;
+            els.fftSize.disabled = streaming;
         });
     }
 
     /**
      * Update controls from a status message.
+     * Syncs ALL form controls to match server state.
      * @param {Object} status
      */
     updateFromStatus(status) {
@@ -258,6 +258,7 @@ export class Controls {
             this._state.set('streaming', status.streaming);
         }
 
+        // Hardware params - sync both state and form controls
         if (status.center_freq !== undefined) {
             this._state.set('centerFreq', status.center_freq);
             els.frequency.value = (status.center_freq / 1e6).toFixed(3);
@@ -267,6 +268,8 @@ export class Controls {
             this._state.set('sampleRate', status.sample_rate);
             els.sampleRateDisplay.textContent =
                 (status.sample_rate / 1e6).toFixed(2) + ' MS/s';
+            // Sync the select dropdown
+            _syncSelect(els.sampleRate, String(status.sample_rate));
         }
 
         if (status.gain !== undefined) {
@@ -277,13 +280,46 @@ export class Controls {
 
         if (status.bandwidth !== undefined) {
             this._state.set('bandwidth', status.bandwidth);
+            _syncSelect(els.bandwidth, String(status.bandwidth));
         }
 
         if (status.fft_size !== undefined) {
             this._state.set('fftSize', status.fft_size);
             els.fftSizeDisplay.textContent = status.fft_size;
+            _syncSelect(els.fftSize, String(status.fft_size));
         }
 
+        // DSP params - sync form controls
+        if (status.window_type !== undefined) {
+            _syncSelect(els.windowType, status.window_type);
+        }
+
+        if (status.averaging_mode !== undefined) {
+            _syncSelect(els.averagingMode, status.averaging_mode);
+            els.averagingAlphaGroup.style.display =
+                status.averaging_mode === 'exponential' ? '' : 'none';
+        }
+
+        if (status.averaging_alpha !== undefined) {
+            els.averagingAlpha.value = status.averaging_alpha;
+            els.averagingAlphaValue.textContent = status.averaging_alpha;
+        }
+
+        if (status.dc_removal !== undefined) {
+            els.dcRemoval.checked = status.dc_removal;
+        }
+
+        if (status.peak_hold !== undefined) {
+            els.peakHoldToggle.checked = status.peak_hold;
+            els.peakHoldReset.disabled = !status.peak_hold;
+        }
+
+        // AGC
+        if (status.agc_enabled !== undefined) {
+            els.agcToggle.checked = status.agc_enabled;
+        }
+
+        // Device info
         if (status.device_connected !== undefined) {
             this._state.set('deviceConnected', status.device_connected);
             if (status.device_connected) {
@@ -294,6 +330,9 @@ export class Controls {
                 els.deviceStatus.className = 'device-status-disconnected';
             }
         }
+
+        // Update RBW display
+        this._updateRBW();
     }
 
     /**
@@ -317,6 +356,54 @@ export class Controls {
 
         if (data.waterfallLines !== undefined && els.waterfallHistory) {
             els.waterfallHistory.textContent = data.waterfallLines;
+        }
+    }
+
+    /**
+     * Update the RBW (Resolution Bandwidth) display.
+     */
+    _updateRBW() {
+        const rbwEl = this._els.rbwDisplay;
+        if (!rbwEl) return;
+        const sampleRate = this._state.get('sampleRate');
+        const fftSize = this._state.get('fftSize');
+        if (sampleRate && fftSize) {
+            const rbw = sampleRate / fftSize;
+            if (rbw >= 1e3) {
+                rbwEl.textContent = (rbw / 1e3).toFixed(2) + ' kHz';
+            } else {
+                rbwEl.textContent = rbw.toFixed(0) + ' Hz';
+            }
+        }
+    }
+}
+
+/**
+ * Sync a <select> element to a value, picking the closest option if exact match fails.
+ */
+function _syncSelect(selectEl, value) {
+    if (!selectEl) return;
+    // Try exact match first
+    for (const opt of selectEl.options) {
+        if (opt.value === value) {
+            selectEl.value = value;
+            return;
+        }
+    }
+    // Try numeric proximity (for sample rate / bandwidth where values may differ slightly)
+    const numVal = parseFloat(value);
+    if (!isNaN(numVal)) {
+        let closest = null;
+        let closestDist = Infinity;
+        for (const opt of selectEl.options) {
+            const dist = Math.abs(parseFloat(opt.value) - numVal);
+            if (dist < closestDist) {
+                closestDist = dist;
+                closest = opt.value;
+            }
+        }
+        if (closest !== null) {
+            selectEl.value = closest;
         }
     }
 }

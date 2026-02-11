@@ -29,8 +29,19 @@
 
                 <!-- Frequency Control -->
                 <div class="control-section">
-                    <label for="frequency">Center Frequency (MHz)</label>
+                    <label for="frequency">Center Frequency (MHz) <span class="badge-live">LIVE</span></label>
                     <input type="number" id="frequency" value="100" min="20" max="6000" step="0.1">
+                    <div class="freq-step-row">
+                        <label for="freq-step" class="freq-step-label">Step:</label>
+                        <select id="freq-step" class="freq-step-select">
+                            <option value="0.001">1 kHz</option>
+                            <option value="0.01">10 kHz</option>
+                            <option value="0.1">100 kHz</option>
+                            <option value="1" selected>1 MHz</option>
+                            <option value="5">5 MHz</option>
+                            <option value="10">10 MHz</option>
+                        </select>
+                    </div>
                     <div class="preset-buttons">
                         <button class="btn-preset" data-freq="100">FM 100 MHz</button>
                         <button class="btn-preset" data-freq="433.92">ISM 433 MHz</button>
@@ -41,7 +52,7 @@
 
                 <!-- Bandwidth Control -->
                 <div class="control-section">
-                    <label for="bandwidth">Bandwidth</label>
+                    <label for="bandwidth">Bandwidth <span class="badge-live">LIVE</span></label>
                     <select id="bandwidth">
                         <option value="200000">200 kHz</option>
                         <option value="500000">500 kHz</option>
@@ -55,13 +66,13 @@
 
                 <!-- Gain Control -->
                 <div class="control-section">
-                    <label for="gain">Gain: <span id="gain-value">40</span> dB</label>
+                    <label for="gain">Gain: <span id="gain-value">40</span> dB <span class="badge-live">LIVE</span></label>
                     <input type="range" id="gain" min="0" max="60" value="40" step="1">
                 </div>
 
                 <!-- Sample Rate Control -->
                 <div class="control-section">
-                    <label for="sample-rate-control">Sample Rate</label>
+                    <label for="sample-rate-control">Sample Rate <span class="badge-live">LIVE</span></label>
                     <select id="sample-rate-control">
                         <option value="1000000">1.0 MS/s</option>
                         <option value="2000000" selected>2.0 MS/s</option>
@@ -73,7 +84,7 @@
 
                 <!-- FFT Size Control -->
                 <div class="control-section">
-                    <label for="fft-size-control">FFT Size</label>
+                    <label for="fft-size-control">FFT Size <span class="badge-stop-required">STOP REQ</span></label>
                     <select id="fft-size-control">
                         <option value="512">512</option>
                         <option value="1024">1024</option>
@@ -81,12 +92,12 @@
                         <option value="4096">4096</option>
                         <option value="8192">8192</option>
                     </select>
-                    <small class="control-hint">Stop streaming to change</small>
+                    <small class="control-hint">Disabled while streaming</small>
                 </div>
 
                 <!-- DSP Controls -->
                 <div class="control-section">
-                    <h3>DSP Settings</h3>
+                    <h3>DSP Settings <span class="badge-live">LIVE</span></h3>
 
                     <label for="window-type">Window Function</label>
                     <select id="window-type">
@@ -144,7 +155,7 @@
 
                     <div class="control-row" style="margin-top: 8px;">
                         <label class="checkbox-label">
-                            <input type="checkbox" id="auto-scale-toggle">
+                            <input type="checkbox" id="auto-scale-toggle" checked>
                             Auto-scale dB
                         </label>
                     </div>
@@ -172,6 +183,10 @@
                         <div class="info-item">
                             <span class="info-label">FFT Size:</span>
                             <span id="fft-size">--</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">RBW:</span>
+                            <span id="rbw-display">--</span>
                         </div>
                         <div class="info-item">
                             <span class="info-label">Update Rate:</span>

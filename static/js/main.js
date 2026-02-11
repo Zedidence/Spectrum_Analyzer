@@ -106,7 +106,8 @@ function renderFrame() {
     });
     gridOverlay.render();
 
-    // Update waterfall
+    // Update waterfall — sync dB range with spectrum renderer so color mapping is correct
+    waterfallRenderer.setScale(spectrumRenderer.dbMin, spectrumRenderer.dbMax);
     waterfallRenderer.addLine(data.spectrum);
     waterfallRenderer.render();
 

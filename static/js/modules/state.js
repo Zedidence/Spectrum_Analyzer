@@ -21,9 +21,9 @@ export class StateStore {
             gain: 40,
             fftSize: 2048,
 
-            // Display params
-            dbMin: -80,
-            dbMax: 20,
+            // Display params — tuned for BladeRF 2.0 typical output
+            dbMin: -100,
+            dbMax: -20,
 
             // Stats
             fps: 0,

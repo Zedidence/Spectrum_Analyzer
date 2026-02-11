@@ -281,6 +281,8 @@ class DSPPipeline:
             self._window_type = value
             self._window = get_window(value, self._fft_size)
             self._window_correction = window_correction_factor(self._window)
+            # Reset peak hold — window correction factor changes the dB calibration
+            self._peak_hold_state = None
             logger.info("Window changed to %s", value)
         elif key == "averaging_mode":
             self._avg_mode = value
@@ -307,6 +309,17 @@ class DSPPipeline:
         elif key == "peak_hold_reset":
             self._peak_hold_state = None
             logger.info("Peak hold reset")
+
+    def get_params(self):
+        """Return current DSP parameter values for status sync."""
+        return {
+            'window_type': self._window_type,
+            'averaging_mode': self._avg_mode,
+            'averaging_alpha': self._avg_alpha,
+            'dc_removal': self._dc_remover is not None,
+            'peak_hold': self._peak_hold_enabled,
+            'peak_hold_decay': self._peak_hold_decay,
+        }
 
     def reset(self):
         """Reset all accumulated state."""

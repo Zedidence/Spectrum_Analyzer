@@ -232,6 +232,61 @@ header h1 {
     font-size: 0.8em;
 }
 
+/* Live / Stop Required Badges */
+.badge-live {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    vertical-align: middle;
+    background-color: rgba(0, 255, 136, 0.15);
+    color: var(--accent-green);
+    border: 1px solid rgba(0, 255, 136, 0.3);
+}
+
+.badge-stop-required {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    vertical-align: middle;
+    background-color: rgba(251, 191, 36, 0.15);
+    color: var(--accent-yellow);
+    border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+/* Disabled form controls */
+.control-section select:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Frequency step size row */
+.freq-step-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.freq-step-label {
+    font-size: var(--font-xs) !important;
+    color: var(--text-muted) !important;
+    margin-bottom: 0 !important;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.freq-step-select {
+    flex: 1;
+    padding: 4px 8px !important;
+    font-size: var(--font-xs) !important;
+}
+
 /* Checkbox Controls */
 .control-row {
     display: flex;

@@ -19,8 +19,8 @@ export class WaterfallRenderer {
         this._canvas = canvas;
         this._maxHistory = maxHistory;
         this._numBins = 1024;
-        this._minDb = -80;
-        this._maxDb = 20;
+        this._minDb = -100;
+        this._maxDb = -20;
         this._currentLine = 0;
         this._scrollOffset = 0;
         this._linesAdded = 0;

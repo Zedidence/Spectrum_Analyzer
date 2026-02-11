@@ -25,10 +25,8 @@ def create_ws_router():
 
         await manager.add_client(ws)
 
-        # Send initial status
-        status = bladerf.get_status()
-        status['streaming'] = manager.is_streaming
-        status['fft_size'] = config.dsp.fft_size
+        # Send initial full status (hardware + DSP + AGC)
+        status = _build_full_status(bladerf, app.state.dsp, manager, config)
         await _send_status(ws, status)
 
         try:
@@ -39,16 +37,14 @@ def create_ws_router():
 
                 if cmd == 'start':
                     ok = await manager.start()
-                    status = bladerf.get_status()
+                    status = _build_full_status(bladerf, app.state.dsp, manager, config)
                     status['streaming'] = ok
-                    status['fft_size'] = config.dsp.fft_size
                     await _send_status(ws, status)
 
                 elif cmd == 'stop':
                     await manager.stop()
-                    status = bladerf.get_status()
+                    status = _build_full_status(bladerf, app.state.dsp, manager, config)
                     status['streaming'] = False
-                    status['fft_size'] = config.dsp.fft_size
                     await _send_status(ws, status)
 
                 elif cmd == 'set_frequency':
@@ -109,9 +105,7 @@ def create_ws_router():
                     })
 
                 elif cmd == 'get_status':
-                    status = bladerf.get_status()
-                    status['streaming'] = manager.is_streaming
-                    status['fft_size'] = config.dsp.fft_size
+                    status = _build_full_status(bladerf, app.state.dsp, manager, config)
                     await _send_status(ws, status)
 
                 elif cmd == 'check_device':
@@ -136,6 +130,16 @@ def create_ws_router():
             await manager.remove_client(ws)
 
     return router
+
+
+def _build_full_status(bladerf, dsp, manager, config):
+    """Build a complete status dict with hardware, DSP, and AGC params."""
+    status = bladerf.get_status()
+    status['streaming'] = manager.is_streaming
+    status['fft_size'] = config.dsp.fft_size
+    status.update(dsp.get_params())
+    status['agc_enabled'] = manager.agc.enabled
+    return status
 
 
 async def _send_status(ws, data):
