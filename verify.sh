@@ -98,6 +98,18 @@ print_status $? "backend/streaming/manager.py exists"
 [ -f "backend/api/websocket.py" ]
 print_status $? "backend/api/websocket.py exists"
 
+[ -f "backend/sweep/engine.py" ]
+print_status $? "backend/sweep/engine.py exists"
+
+[ -f "backend/sweep/stitcher.py" ]
+print_status $? "backend/sweep/stitcher.py exists"
+
+[ -f "backend/detection/detector.py" ]
+print_status $? "backend/detection/detector.py exists"
+
+[ -f "backend/detection/database.py" ]
+print_status $? "backend/detection/database.py exists"
+
 [ -f "static/index.html" ]
 print_status $? "static/index.html exists"
 
@@ -110,10 +122,14 @@ echo "Testing Python imports..."
 python3 -c "
 import sys
 sys.path.insert(0, 'backend')
-from config import Config
+from config import Config, SweepConfig, DetectionConfig
 from hardware.bladerf_interface import BladeRFInterface
 from dsp.pipeline import DSPPipeline
 from streaming.manager import StreamManager
+from sweep.engine import SweepEngine
+from sweep.stitcher import SpectrumStitcher, compute_step_frequencies
+from detection.detector import SignalDetector
+from detection.database import SignalDatabase
 from app import create_app
 print('✓ All Python modules import successfully')
 " 2>&1

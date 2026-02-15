@@ -34,6 +34,17 @@ export class StateStore {
             // Device
             deviceConnected: false,
             deviceInfo: null,
+
+            // Sweep
+            sweepMode: 'off',       // 'off', 'survey', 'band_monitor'
+            sweepRunning: false,
+            sweepProgress: 0,        // 0.0 to 1.0
+            sweepFreqStart: 47e6,
+            sweepFreqEnd: 6e9,
+
+            // Recording / Playback
+            playbackActive: false,
+            iqRecording: false,
         };
 
         this._listeners = new Map();
@@ -62,6 +73,22 @@ export class StateStore {
         if (callbacks) {
             for (const cb of callbacks) {
                 cb(value, old, key);
+            }
+        }
+    }
+
+    /**
+     * Fire an action (always triggers listeners, even with same value).
+     * Use for one-shot events like dB range adjustment.
+     * @param {string} key
+     * @param {*} value
+     */
+    fire(key, value) {
+        this._state[key] = value;
+        const callbacks = this._listeners.get(key);
+        if (callbacks) {
+            for (const cb of callbacks) {
+                cb(value, undefined, key);
             }
         }
     }

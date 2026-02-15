@@ -18,6 +18,10 @@ from config import Config
 from hardware.bladerf_interface import BladeRFInterface
 from dsp.pipeline import DSPPipeline
 from streaming.manager import StreamManager
+from sweep.engine import SweepEngine
+from detection.detector import SignalDetector
+from detection.database import SignalDatabase
+from recording.manager import RecordingManager
 from api.routes import create_router
 from api.websocket import create_ws_router
 
@@ -50,7 +54,7 @@ async def lifespan(app: FastAPI):
     app.state.dsp = dsp
 
     # Initialize stream manager
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     manager = StreamManager(
         bladerf=bladerf,
         dsp=dsp,
@@ -59,12 +63,38 @@ async def lifespan(app: FastAPI):
     )
     app.state.stream_manager = manager
 
+    # Initialize sweep engine
+    sweep_engine = SweepEngine(
+        bladerf=bladerf,
+        config=config,
+        loop=loop,
+        stream_manager=manager,
+    )
+    app.state.sweep_engine = sweep_engine
+
+    # Initialize signal detection
+    signal_db = SignalDatabase(
+        db_path=str(BACKEND_DIR.parent / "data" / "signals.db"),
+    )
+    app.state.signal_db = signal_db
+
+    detector = SignalDetector(config.detection)
+    manager.set_detector(detector, signal_db)
+    app.state.detector = detector
+
+    # Initialize recording manager
+    recording_manager = RecordingManager(config.recording)
+    manager.set_recording_manager(recording_manager)
+    app.state.recording_manager = recording_manager
+
     logger.info("Application initialized, ready for connections")
 
     yield
 
     # Shutdown
     logger.info("Shutting down...")
+    recording_manager.stop_all()
+    await sweep_engine.stop()
     await manager.stop()
     bladerf.cleanup()
     logger.info("Shutdown complete")

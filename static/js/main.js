@@ -14,6 +14,9 @@ import { WaterfallRenderer } from './rendering/waterfall-renderer.js';
 import { GridOverlay } from './rendering/grid-overlay.js';
 import { ZoomController } from './rendering/zoom-controller.js';
 import { MarkerManager } from './analysis/markers.js';
+import { PanoramaRenderer } from './rendering/panorama-renderer.js';
+import { SignalList } from './modules/signal-list.js';
+import { RecorderUI } from './modules/recorder-ui.js';
 
 // Initialize state store
 const state = new StateStore();
@@ -32,6 +35,18 @@ const zoomController = new ZoomController(spectrumStack);
 
 // Markers
 const markerManager = new MarkerManager();
+
+// Panorama renderer (for sweep mode)
+const panoramaCanvas = document.getElementById('panorama-canvas');
+const panoramaOverlay = document.getElementById('panorama-overlay');
+const panoramaRenderer = new PanoramaRenderer(panoramaCanvas, panoramaOverlay);
+
+// Display containers for mode switching
+const liveSpectrumContainer = document.getElementById('live-spectrum-container');
+const liveWaterfallContainer = document.getElementById('live-waterfall-container');
+const panoramaContainer = document.getElementById('panorama-container');
+const panoramaRange = document.getElementById('panorama-range');
+const panoramaSweepTime = document.getElementById('panorama-sweep-time');
 
 // Zoom info display
 const zoomInfo = document.getElementById('zoom-info');
@@ -75,6 +90,58 @@ function onSpectrum(data) {
 }
 
 /**
+ * Handle incoming sweep data from WebSocket.
+ */
+let pendingSweepRender = false;
+
+function onSweep(data) {
+    if (data.type === 'sweep_panorama') {
+        panoramaRenderer.updatePanorama(data);
+        if (panoramaRange) {
+            panoramaRange.textContent =
+                (data.freqStart / 1e6).toFixed(0) + ' - ' +
+                (data.freqEnd / 1e6).toFixed(0) + ' MHz';
+        }
+        if (panoramaSweepTime) {
+            panoramaSweepTime.textContent =
+                data.sweepTimeMs.toFixed(0) + ' ms';
+        }
+    } else if (data.type === 'sweep_segment') {
+        panoramaRenderer.updateSegment(data);
+    }
+
+    // Ensure panorama view is visible during sweep
+    if (!state.get('sweepRunning')) {
+        showSweepView(true);
+        state.set('sweepRunning', true);
+    }
+
+    // Schedule a render for the panorama
+    if (!pendingSweepRender) {
+        pendingSweepRender = true;
+        requestAnimationFrame(() => {
+            pendingSweepRender = false;
+            panoramaRenderer.render();
+        });
+    }
+}
+
+/**
+ * Toggle between live and panorama display views.
+ */
+function showSweepView(sweep) {
+    if (sweep) {
+        liveSpectrumContainer.style.display = 'none';
+        liveWaterfallContainer.style.display = 'none';
+        panoramaContainer.style.display = '';
+    } else {
+        liveSpectrumContainer.style.display = '';
+        liveWaterfallContainer.style.display = '';
+        panoramaContainer.style.display = 'none';
+    }
+}
+
+/**
  * Render a single frame. Called via requestAnimationFrame.
  */
 function renderFrame() {
@@ -103,6 +170,7 @@ function renderFrame() {
         viewStart: zoomController.viewStart,
         viewEnd: zoomController.viewEnd,
         markers: markerManager.markers,
+        detectedSignals: signalList.getSignals(),
     });
     gridOverlay.render();
 
@@ -157,6 +225,15 @@ function onStatus(data) {
 
     // Server status update
     controls.updateFromStatus(data);
+    signalList.updateFromStatus(data);
+    recorderUI.updateFromStatus(data);
+}
+
+/**
+ * Handle signal detection events from WebSocket.
+ */
+function onSignalEvent(data) {
+    signalList.handleEvent(data);
 }
 
 /**
@@ -167,10 +244,18 @@ function onError(message) {
 }
 
 // Initialize connection
-const connection = new Connection(onSpectrum, onStatus, onError);
+const connection = new Connection(onSpectrum, onStatus, onError, onSweep, onSignalEvent);
 
 // Initialize controls
 const controls = new Controls(state, connection);
+
+// Initialize signal list
+const detectionContainer = document.getElementById('detection-container');
+const signalList = new SignalList(detectionContainer, connection);
+
+// Initialize recorder UI
+const recordingContainer = document.getElementById('recording-container');
+const recorderUI = new RecorderUI(recordingContainer, connection, state);
 
 // Initialize keyboard shortcuts
 const keyboard = new KeyboardHandler({
@@ -210,6 +295,14 @@ state.on('dbRangeAdjust', (direction) => {
     }
 });
 
+// Handle sweep mode changes — toggle between live and panorama views
+state.on('sweepRunning', (running) => {
+    showSweepView(running);
+    if (!running) {
+        panoramaRenderer.resetSweep();
+    }
+});
+
 // Connect
 connection.connect();
 
@@ -242,8 +335,11 @@ window.debugApp = () => {
         markers: markerManager.markers.length,
         autoScale: spectrumRenderer.autoScale,
         dbRange: [spectrumRenderer.dbMin, spectrumRenderer.dbMax],
+        sweepMode: state.get('sweepMode'),
+        sweepRunning: state.get('sweepRunning'),
+        sweepProgress: state.get('sweepProgress'),
     });
 };
 
-console.log('Spectrum Analyzer v2.0 initialized');
-console.log('Shortcuts: M=marker, N=next peak, D=delta, C=clear, H=peak hold, R=reset zoom, A=auto-scale, +/-=dB range');
+console.log('RF Exploration Tool initialized');
+console.log('Press ? for keyboard shortcuts');

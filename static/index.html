@@ -3,16 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spectrum Analyzer - BladeRF</title>
+    <title>RF Exploration Tool - BladeRF</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
     <div class="container">
         <header>
-            <h1>Spectrum Analyzer</h1>
-            <div class="connection-status" id="connection-status">
-                <span class="status-indicator" id="status-indicator"></span>
-                <span id="status-text">Connecting...</span>
+            <h1>RF Exploration Tool</h1>
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <span id="mode-indicator" class="badge-live" style="display: none;">LIVE</span>
+                <div class="connection-status" id="connection-status">
+                    <span class="status-indicator" id="status-indicator"></span>
+                    <span id="status-text">Connecting...</span>
+                </div>
             </div>
         </header>
 
@@ -140,6 +143,130 @@
                     </div>
                 </div>
 
+                <!-- Sweep Controls -->
+                <div class="control-section">
+                    <h3>Sweep Mode</h3>
+                    <label for="sweep-mode-select">Mode</label>
+                    <select id="sweep-mode-select">
+                        <option value="off" selected>Off (Live Mode)</option>
+                        <option value="survey">Full Survey (47 MHz - 6 GHz)</option>
+                        <option value="band_monitor">Band Monitor</option>
+                    </select>
+                    <div id="sweep-range-controls" style="display: none; margin-top: 8px;">
+                        <label for="sweep-start-freq">Start (MHz)</label>
+                        <input type="number" id="sweep-start-freq" value="400" min="47" max="6000" step="1">
+                        <label for="sweep-end-freq" style="margin-top: 6px;">End (MHz)</label>
+                        <input type="number" id="sweep-end-freq" value="500" min="47" max="6000" step="1">
+                    </div>
+                    <div id="sweep-advanced" style="margin-top: 8px;">
+                        <label for="sweep-rate">Sweep Sample Rate</label>
+                        <select id="sweep-rate">
+                            <option value="10000000">10 MS/s (balanced)</option>
+                            <option value="20000000" selected>20 MS/s (fast)</option>
+                        </select>
+                        <label for="sweep-averages" style="margin-top: 6px;">Averages per step</label>
+                        <select id="sweep-averages">
+                            <option value="1">1 (fastest)</option>
+                            <option value="4" selected>4 (balanced)</option>
+                            <option value="8">8 (sensitive)</option>
+                            <option value="16">16 (max sensitivity)</option>
+                        </select>
+                    </div>
+                    <div class="control-row" style="margin-top: 10px;">
+                        <button id="sweep-start-btn" class="btn btn-primary" style="flex: 1;">Sweep</button>
+                        <button id="sweep-stop-btn" class="btn btn-danger" style="flex: 1;" disabled>Stop Sweep</button>
+                    </div>
+                    <div id="sweep-progress-container" style="display: none; margin-top: 8px;">
+                        <div style="background: var(--bg-tertiary); border-radius: 4px; height: 6px; overflow: hidden;">
+                            <div id="sweep-progress-bar" style="background: var(--accent-green); height: 100%; width: 0%; transition: width 0.3s;"></div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-top: 4px; font-size: 11px; color: var(--text-muted);">
+                            <span id="sweep-progress-text">0%</span>
+                            <span id="sweep-time-text"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Signal Detection -->
+                <div class="control-section" id="detection-container">
+                    <h3>Signal Detection</h3>
+                    <div class="control-row">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="detection-toggle">
+                            Enable Detection
+                        </label>
+                    </div>
+                    <label for="detection-threshold">Threshold: <span id="detection-threshold-value">6</span> dB above noise</label>
+                    <input type="range" id="detection-threshold" min="3" max="30" value="6" step="1">
+                    <div class="signal-list-header">
+                        <span>Signals: <span id="signal-count">0</span></span>
+                    </div>
+                    <div id="signal-list-items" class="signal-list-scroll">
+                        <div class="signal-empty">No signals detected</div>
+                    </div>
+                </div>
+
+                <!-- Recording & Playback -->
+                <div class="control-section" id="recording-container">
+                    <h3>Recording</h3>
+
+                    <!-- IQ Recording -->
+                    <div class="control-row" style="margin-top: 0; margin-bottom: 8px;">
+                        <button id="iq-record-btn" class="btn-small" style="flex: 1; color: var(--accent-red);">&#9679; Record IQ</button>
+                        <button id="iq-stop-btn" class="btn-small" style="flex: 1;" disabled>Stop IQ</button>
+                    </div>
+                    <div id="iq-record-status" style="font-size: 11px; color: var(--accent-red); min-height: 16px;"></div>
+
+                    <!-- Spectrum Recording -->
+                    <div class="control-row" style="margin-bottom: 8px;">
+                        <button id="spec-record-btn" class="btn-small" style="flex: 1; color: var(--accent-yellow);">&#9679; Record Spectrum</button>
+                        <button id="spec-stop-btn" class="btn-small" style="flex: 1;" disabled>Stop Spectrum</button>
+                    </div>
+                    <div id="spec-record-status" style="font-size: 11px; color: var(--accent-yellow); min-height: 16px;"></div>
+
+                    <!-- Playback Controls (hidden until active) -->
+                    <div id="playback-controls" style="display: none; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-primary);">
+                        <h3 style="font-size: 13px; margin-bottom: 6px;">Playback</h3>
+                        <div id="playback-status" style="font-size: 11px; color: var(--text-muted); margin-bottom: 4px;"></div>
+                        <div style="background: var(--bg-tertiary); border-radius: 4px; height: 6px; overflow: hidden;">
+                            <div id="playback-progress" style="background: var(--accent-cyan); height: 100%; width: 0%; transition: width 0.3s;"></div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-top: 4px; font-size: 11px; color: var(--text-muted);">
+                            <span id="playback-time">0.0s / 0.0s</span>
+                            <select id="playback-speed" style="background: var(--bg-tertiary); color: var(--text-primary); border: 1px solid var(--border-primary); border-radius: 3px; font-size: 11px; padding: 1px 4px;">
+                                <option value="0.1">0.1x</option>
+                                <option value="0.5">0.5x</option>
+                                <option value="1" selected>1x</option>
+                                <option value="2">2x</option>
+                                <option value="5">5x</option>
+                                <option value="10">10x</option>
+                            </select>
+                        </div>
+                        <div class="control-row" style="margin-top: 6px;">
+                            <button id="playback-pause-btn" class="btn-small" style="flex: 1;">Pause</button>
+                            <button id="playback-stop-btn" class="btn-small" style="flex: 1;">Stop</button>
+                        </div>
+                        <div class="control-row" style="margin-top: 4px;">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="playback-loop">
+                                Loop
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Recordings List -->
+                    <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-primary);">
+                        <div class="signal-list-header">
+                            <span>Recordings</span>
+                            <button id="recordings-refresh-btn" class="btn-small">Refresh</button>
+                        </div>
+                        <div id="storage-info" style="font-size: 10px; color: var(--text-muted); margin-bottom: 4px;"></div>
+                        <div id="recordings-list" class="signal-list-scroll" style="max-height: 250px;">
+                            <div class="signal-empty">No recordings</div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Display Settings -->
                 <div class="control-section">
                     <h3>Display</h3>
@@ -199,8 +326,8 @@
 
             <!-- Right Side - Displays -->
             <main class="display-area">
-                <!-- Spectrum Display -->
-                <div class="display-container">
+                <!-- Live Spectrum Display -->
+                <div class="display-container" id="live-spectrum-container">
                     <div class="display-header">
                         <h3>Spectrum</h3>
                         <div class="display-info">
@@ -215,8 +342,8 @@
                     </div>
                 </div>
 
-                <!-- Waterfall Display -->
-                <div class="display-container">
+                <!-- Live Waterfall Display -->
+                <div class="display-container" id="live-waterfall-container">
                     <div class="display-header">
                         <h3>Waterfall</h3>
                         <div class="display-info">
@@ -225,11 +352,26 @@
                     </div>
                     <canvas id="waterfall-canvas"></canvas>
                 </div>
+
+                <!-- Panorama Display (hidden, shown during sweep) -->
+                <div class="display-container" id="panorama-container" style="display: none;">
+                    <div class="display-header">
+                        <h3>Panoramic Spectrum</h3>
+                        <div class="display-info">
+                            <span id="panorama-range">--</span>
+                            <span id="panorama-sweep-time">--</span>
+                        </div>
+                    </div>
+                    <div class="canvas-stack" id="panorama-stack">
+                        <canvas id="panorama-canvas"></canvas>
+                        <canvas id="panorama-overlay" class="canvas-overlay"></canvas>
+                    </div>
+                </div>
             </main>
         </div>
 
         <footer>
-            <p>Spectrum Analyzer v2.0 | BladeRF 2.0 | FastAPI + WebGL</p>
+            <p>RF Exploration Tool v2.1 | BladeRF 2.0 | <kbd>?</kbd> for shortcuts</p>
         </footer>
     </div>
 

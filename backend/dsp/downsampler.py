@@ -24,6 +24,10 @@ class Downsampler:
         """
         Downsample spectrum data using peak-preserving decimation.
 
+        Handles non-integer ratios by mapping each output bin to a
+        floating-point range of input bins, ensuring the full spectrum
+        is covered without truncation.
+
         Args:
             spectrum: float32 numpy array of power values
 
@@ -34,11 +38,16 @@ class Downsampler:
         if n <= self._target:
             return spectrum
 
-        # Peak-preserving decimation
-        factor = n // self._target
-        trimmed = spectrum[:self._target * factor]
-        reshaped = trimmed.reshape(self._target, factor)
-        return np.max(reshaped, axis=1).astype(np.float32)
+        # Use floating-point bin mapping to cover the entire input range
+        result = np.empty(self._target, dtype=np.float32)
+        ratio = n / self._target
+        for i in range(self._target):
+            start = int(i * ratio)
+            end = int((i + 1) * ratio)
+            end = max(end, start + 1)  # At least one bin
+            result[i] = np.max(spectrum[start:end])
+
+        return result
 
     @property
     def target_bins(self):

@@ -237,7 +237,11 @@ export class WaterfallRenderer {
      * @param {Float32Array} spectrum
      */
     addLine(spectrum) {
-        if (this._contextLost || this._fallback) return;
+        if (this._fallback) {
+            this._fallbackAddLine(spectrum);
+            return;
+        }
+        if (this._contextLost) return;
 
         // Handle bin count changes
         if (spectrum.length !== this._numBins) {
@@ -280,7 +284,11 @@ export class WaterfallRenderer {
 
     /** Render the waterfall display. */
     render() {
-        if (this._contextLost || this._fallback) return;
+        if (this._fallback) {
+            this._fallbackRender();
+            return;
+        }
+        if (this._contextLost) return;
 
         const gl = this._gl;
         gl.clearColor(0.039, 0.055, 0.153, 1.0);
@@ -337,6 +345,88 @@ export class WaterfallRenderer {
 
     _initCanvas2DFallback() {
         this._ctx = this._canvas.getContext('2d');
-        // Minimal fallback for systems without WebGL
+        this._fbHistory = [];  // Array of Float32Array spectrum lines
+        this._fbColormap = this._buildFallbackColormap();
+        this._initResize();
+    }
+
+    _buildFallbackColormap() {
+        // Simple blue-cyan-yellow-red colormap (256 entries, each [r,g,b])
+        const map = new Array(256);
+        for (let i = 0; i < 256; i++) {
+            const t = i / 255;
+            let r, g, b;
+            if (t < 0.33) {
+                const s = t / 0.33;
+                r = 0; g = Math.floor(s * 255); b = Math.floor((1 - s * 0.5) * 255);
+            } else if (t < 0.66) {
+                const s = (t - 0.33) / 0.33;
+                r = Math.floor(s * 255); g = 255; b = Math.floor((0.5 - s * 0.5) * 255);
+            } else {
+                const s = (t - 0.66) / 0.34;
+                r = 255; g = Math.floor((1 - s) * 255); b = 0;
+            }
+            map[i] = [r, g, b];
+        }
+        return map;
+    }
+
+    _fallbackAddLine(spectrum) {
+        const line = new Float32Array(spectrum);
+        this._fbHistory.unshift(line);
+        if (this._fbHistory.length > this._maxHistory) {
+            this._fbHistory.length = this._maxHistory;
+        }
+        this._numBins = spectrum.length;
+        this._hasData = true;
+        this._linesAdded++;
+    }
+
+    _fallbackRender() {
+        const ctx = this._ctx;
+        const w = this._canvas.width;
+        const h = this._canvas.height;
+        if (!w || !h) return;
+
+        ctx.fillStyle = '#0a0e27';
+        ctx.fillRect(0, 0, w, h);
+
+        if (!this._hasData || this._fbHistory.length === 0) return;
+
+        const numLines = this._fbHistory.length;
+        const lineHeight = Math.max(1, h / this._maxHistory);
+        const dbRange = this._maxDb - this._minDb;
+
+        const imgData = ctx.createImageData(w, 1);
+        const pixels = imgData.data;
+
+        for (let row = 0; row < numLines && row * lineHeight < h; row++) {
+            const spectrum = this._fbHistory[row];
+            const bins = spectrum.length;
+
+            for (let x = 0; x < w; x++) {
+                const binIdx = Math.floor(x / w * bins);
+                const val = spectrum[Math.min(binIdx, bins - 1)];
+                let norm = (val - this._minDb) / dbRange;
+                norm = Math.max(0, Math.min(1, norm));
+                const ci = Math.floor(norm * 255);
+                const [r, g, b] = this._fbColormap[ci];
+                const px = x * 4;
+                pixels[px] = r;
+                pixels[px + 1] = g;
+                pixels[px + 2] = b;
+                pixels[px + 3] = 255;
+            }
+
+            const y = Math.floor(row * lineHeight);
+            ctx.putImageData(imgData, 0, y);
+            // Fill remaining sub-pixel rows for this line
+            if (lineHeight > 1) {
+                const fillH = Math.ceil(lineHeight) - 1;
+                if (fillH > 0) {
+                    ctx.drawImage(this._canvas, 0, y, w, 1, 0, y + 1, w, fillH);
+                }
+            }
+        }
     }
 }

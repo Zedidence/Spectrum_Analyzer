@@ -17,6 +17,7 @@ Pipeline stages:
 
 import numpy as np
 import logging
+import threading
 from collections import deque
 from typing import Optional
 from dataclasses import dataclass, field
@@ -106,6 +107,10 @@ class DSPPipeline:
         # Downsampler
         self._downsampler = Downsampler(config.target_display_bins)
 
+        # Thread safety: protects mutable state shared between DSP thread
+        # (process()) and asyncio thread (set_param())
+        self._lock = threading.Lock()
+
         logger.info(
             "DSP pipeline: fft=%d, window=%s, avg=%s, dc_removal=%s, overlap=50%%",
             config.fft_size,
@@ -133,40 +138,44 @@ class DSPPipeline:
             )
             return None
 
-        # Stage 1: DC offset removal
-        if self._dc_remover:
-            iq_chunk = self._dc_remover.remove(iq_chunk)
+        with self._lock:
+            # Stage 1: DC offset removal
+            if self._dc_remover:
+                iq_chunk = self._dc_remover.remove(iq_chunk)
 
-        # Stage 2: Overlap-save accumulation
-        if self._overlap_enabled:
-            results = self._process_with_overlap(iq_chunk)
-            if results is None:
-                return None
-            # Average the overlapped FFT results
-            power_dbfs = np.mean(results, axis=0)
-        else:
-            power_dbfs = self._compute_spectrum(iq_chunk)
+            # Stage 2: Overlap-save accumulation (in linear power domain)
+            if self._overlap_enabled:
+                results = self._process_with_overlap(iq_chunk)
+                if results is None:
+                    return None
+                # Average the overlapped FFT results in linear power
+                power_linear = np.mean(results, axis=0)
+            else:
+                power_linear = self._compute_spectrum_linear(iq_chunk)
 
-        # Stage 5: Averaging
-        spectrum = self._apply_averaging(power_dbfs)
+            # Stage 5: Averaging (in linear power domain for correctness)
+            averaged_linear = self._apply_averaging(power_linear)
 
-        # Stage 6: Peak hold update (before downsample for full resolution)
-        peak_hold_full = self._update_peak_hold(spectrum)
+            # Convert to dBFS after averaging
+            spectrum = (10.0 * np.log10(np.maximum(averaged_linear, 1e-20))).astype(np.float32)
 
-        # Stage 7: Noise floor estimation
-        noise_floor = self._estimate_noise_floor(spectrum)
+            # Stage 6: Peak hold update (before downsample for full resolution)
+            peak_hold_full = self._update_peak_hold(spectrum)
 
-        # Stage 8: Downsample for display
-        display_spectrum = self._downsampler.downsample(spectrum)
-        display_peak_hold = None
-        if peak_hold_full is not None:
-            display_peak_hold = self._downsampler.downsample(peak_hold_full)
+            # Stage 7: Noise floor estimation
+            noise_floor = self._estimate_noise_floor(spectrum)
 
-        # Find peak
-        peak_idx = np.argmax(display_spectrum)
-        peak_power = float(display_spectrum[peak_idx])
-        num_bins = len(display_spectrum)
-        peak_freq_offset = (peak_idx - num_bins / 2) / num_bins
+            # Stage 8: Downsample for display
+            display_spectrum = self._downsampler.downsample(spectrum)
+            display_peak_hold = None
+            if peak_hold_full is not None:
+                display_peak_hold = self._downsampler.downsample(peak_hold_full)
+
+            # Find peak
+            peak_idx = np.argmax(display_spectrum)
+            peak_power = float(display_spectrum[peak_idx])
+            num_bins = len(display_spectrum)
+            peak_freq_offset = (peak_idx - num_bins / 2) / num_bins
 
         return DSPResult(
             spectrum=display_spectrum,
@@ -181,7 +190,7 @@ class DSPPipeline:
         Overlap-save: combine current chunk with previous half to produce
         two overlapping FFT blocks.
 
-        Returns array of dBFS spectra (shape: [N, fft_size]) or None if
+        Returns array of linear power spectra (shape: [N, fft_size]) or None if
         still accumulating the first block.
         """
         half = self._fft_size // 2
@@ -189,7 +198,7 @@ class DSPPipeline:
         if self._overlap_buffer is None:
             # First chunk: process it directly, save second half for overlap
             self._overlap_buffer = iq_chunk[half:].copy()
-            return np.array([self._compute_spectrum(iq_chunk)])
+            return np.array([self._compute_spectrum_linear(iq_chunk)])
 
         # Build overlapped block: last half of previous + first half of current
         overlapped = np.concatenate([self._overlap_buffer, iq_chunk[:half]])
@@ -198,20 +207,20 @@ class DSPPipeline:
         self._overlap_buffer = iq_chunk[half:].copy()
 
         # Compute spectra for both blocks
-        spec_overlap = self._compute_spectrum(overlapped)
-        spec_current = self._compute_spectrum(iq_chunk)
+        spec_overlap = self._compute_spectrum_linear(overlapped)
+        spec_current = self._compute_spectrum_linear(iq_chunk)
 
         return np.array([spec_overlap, spec_current])
 
-    def _compute_spectrum(self, samples):
+    def _compute_spectrum_linear(self, samples):
         """
-        Compute power spectrum in dBFS from IQ samples.
+        Compute normalized linear power spectrum from IQ samples.
 
         Args:
             samples: complex64 array of length fft_size
 
         Returns:
-            float32 array of power in dBFS
+            float32 array of normalized linear power
         """
         # Windowing
         windowed = samples * self._window
@@ -224,32 +233,31 @@ class DSPPipeline:
         else:
             fft_result = np.fft.fftshift(np.fft.fft(windowed))
 
-        # Power spectrum in dBFS
+        # Normalized linear power
         power = np.abs(fft_result) ** 2
-        power = np.maximum(power, 1e-20)
         normalization = self._fft_size ** 2 * self._window_correction
         if normalization > 0:
-            return (10.0 * np.log10(power / normalization)).astype(np.float32)
-        else:
-            return (10.0 * np.log10(power)).astype(np.float32)
+            power = power / normalization
+        return np.maximum(power, 1e-20).astype(np.float32)
 
-    def _apply_averaging(self, power_dbfs):
+    def _apply_averaging(self, power_linear):
+        """Apply averaging in linear power domain."""
         if self._avg_mode == "none":
-            return power_dbfs
+            return power_linear
 
         elif self._avg_mode == "linear":
-            self._avg_buffer.append(power_dbfs.copy())
+            self._avg_buffer.append(power_linear.copy())
             return np.mean(self._avg_buffer, axis=0, dtype=np.float32)
 
         elif self._avg_mode == "exponential":
             if self._ema_state is None:
-                self._ema_state = power_dbfs.copy()
+                self._ema_state = power_linear.copy()
             else:
                 alpha = self._avg_alpha
-                self._ema_state = alpha * power_dbfs + (1 - alpha) * self._ema_state
+                self._ema_state = alpha * power_linear + (1 - alpha) * self._ema_state
             return self._ema_state.copy()
 
-        return power_dbfs
+        return power_linear
 
     def _update_peak_hold(self, spectrum):
         """Update peak hold trace. Returns peak hold array or None if disabled."""
@@ -276,7 +284,12 @@ class DSPPipeline:
         return float(np.median(self._noise_samples))
 
     def set_param(self, key, value):
-        """Dynamically update DSP parameters."""
+        """Dynamically update DSP parameters (thread-safe)."""
+        with self._lock:
+            self._set_param_locked(key, value)
+
+    def _set_param_locked(self, key, value):
+        """Update DSP parameters (must hold self._lock)."""
         if key == "window_type" and value != self._window_type:
             self._window_type = value
             self._window = get_window(value, self._fft_size)
@@ -322,14 +335,15 @@ class DSPPipeline:
         }
 
     def reset(self):
-        """Reset all accumulated state."""
-        self._avg_buffer.clear()
-        self._ema_state = None
-        self._noise_samples.clear()
-        self._overlap_buffer = None
-        self._peak_hold_state = None
-        if self._dc_remover:
-            self._dc_remover.reset()
+        """Reset all accumulated state (thread-safe)."""
+        with self._lock:
+            self._avg_buffer.clear()
+            self._ema_state = None
+            self._noise_samples.clear()
+            self._overlap_buffer = None
+            self._peak_hold_state = None
+            if self._dc_remover:
+                self._dc_remover.reset()
 
     @property
     def fft_size(self):

@@ -7,11 +7,17 @@
 
 export const VERSION = 0x02;
 export const MSG_SPECTRUM = 0x01;
+export const MSG_SWEEP_SEGMENT = 0x03;
+export const MSG_SWEEP_PANORAMA = 0x04;
 export const FRAME_HEADER_SIZE = 8;
 export const SPECTRUM_HEADER_SIZE = 56;
+export const SWEEP_SEGMENT_HEADER_SIZE = 44;
+export const SWEEP_PANORAMA_HEADER_SIZE = 40;
 
 // Flags
 export const FLAG_PEAK_HOLD = 0x0001;
+export const FLAG_SWEEP_COMPLETE = 0x0002;
+export const FLAG_SWEEP_IN_PROGRESS = 0x0004;
 
 /**
  * Parse a binary WebSocket frame.
@@ -43,6 +49,14 @@ export function parseFrame(buffer) {
 
     if (msgType === MSG_SPECTRUM) {
         return parseSpectrumPayload(buffer, FRAME_HEADER_SIZE, payloadLen, flags);
+    }
+
+    if (msgType === MSG_SWEEP_SEGMENT) {
+        return parseSweepSegmentPayload(buffer, FRAME_HEADER_SIZE, payloadLen, flags);
+    }
+
+    if (msgType === MSG_SWEEP_PANORAMA) {
+        return parseSweepPanoramaPayload(buffer, FRAME_HEADER_SIZE, payloadLen, flags);
     }
 
     return null;
@@ -79,7 +93,7 @@ function parseSpectrumPayload(buffer, offset, payloadLen, flags) {
         return null;
     }
 
-    const spectrum = new Float32Array(buffer, spectrumByteOffset, numBins);
+    const spectrum = new Float32Array(buffer.slice(spectrumByteOffset, spectrumByteOffset + spectrumByteLength));
 
     // Parse peak hold if flag is set
     let peakHold = null;
@@ -87,7 +101,7 @@ function parseSpectrumPayload(buffer, offset, payloadLen, flags) {
         const peakHoldByteOffset = spectrumByteOffset + spectrumByteLength;
         const peakHoldByteLength = numBins * 4;
         if (buffer.byteLength >= peakHoldByteOffset + peakHoldByteLength) {
-            peakHold = new Float32Array(buffer, peakHoldByteOffset, numBins);
+            peakHold = new Float32Array(buffer.slice(peakHoldByteOffset, peakHoldByteOffset + peakHoldByteLength));
         }
     }
 
@@ -105,5 +119,102 @@ function parseSpectrumPayload(buffer, offset, payloadLen, flags) {
         timestamp,
         spectrum,
         peakHold,
+    };
+}
+
+/**
+ * Parse sweep segment payload.
+ *
+ * Segment header (44 bytes):
+ *   sweep_id(I) + segment_idx(H) + total_segments(H) +
+ *   freq_start(d) + freq_end(d) + sweep_start(d) + sweep_end(d) + num_bins(I)
+ */
+function parseSweepSegmentPayload(buffer, offset, payloadLen, flags) {
+    if (payloadLen < SWEEP_SEGMENT_HEADER_SIZE) {
+        console.warn('Sweep segment payload too small:', payloadLen);
+        return null;
+    }
+
+    const view = new DataView(buffer, offset);
+
+    const sweepId = view.getUint32(0, false);
+    const segmentIdx = view.getUint16(4, false);
+    const totalSegments = view.getUint16(6, false);
+    const freqStart = view.getFloat64(8, false);
+    const freqEnd = view.getFloat64(16, false);
+    const sweepStart = view.getFloat64(24, false);
+    const sweepEnd = view.getFloat64(32, false);
+    const numBins = view.getUint32(40, false);
+
+    const spectrumByteOffset = offset + SWEEP_SEGMENT_HEADER_SIZE;
+    const spectrumByteLength = numBins * 4;
+
+    if (buffer.byteLength < spectrumByteOffset + spectrumByteLength) {
+        console.warn('Not enough data for sweep segment bins');
+        return null;
+    }
+
+    // Copy spectrum data (can't use typed array view directly as buffer may be reused)
+    const spectrum = new Float32Array(buffer.slice(spectrumByteOffset, spectrumByteOffset + spectrumByteLength));
+
+    return {
+        type: 'sweep_segment',
+        sweepId,
+        segmentIdx,
+        totalSegments,
+        freqStart,
+        freqEnd,
+        sweepStart,
+        sweepEnd,
+        numBins,
+        spectrum,
+        isComplete: !!(flags & FLAG_SWEEP_COMPLETE),
+    };
+}
+
+/**
+ * Parse sweep panorama payload.
+ *
+ * Panorama header (40 bytes):
+ *   sweep_id(I) + sweep_mode(B) + pad(3B) +
+ *   freq_start(d) + freq_end(d) + num_bins(I) + sweep_time_ms(f) + timestamp(d)
+ */
+function parseSweepPanoramaPayload(buffer, offset, payloadLen, flags) {
+    if (payloadLen < SWEEP_PANORAMA_HEADER_SIZE) {
+        console.warn('Sweep panorama payload too small:', payloadLen);
+        return null;
+    }
+
+    const view = new DataView(buffer, offset);
+
+    const sweepId = view.getUint32(0, false);
+    const sweepMode = view.getUint8(4);
+    // bytes 5-7 are padding
+    const freqStart = view.getFloat64(8, false);
+    const freqEnd = view.getFloat64(16, false);
+    const numBins = view.getUint32(24, false);
+    const sweepTimeMs = view.getFloat32(28, false);
+    const timestamp = view.getFloat64(32, false);
+
+    const spectrumByteOffset = offset + SWEEP_PANORAMA_HEADER_SIZE;
+    const spectrumByteLength = numBins * 4;
+
+    if (buffer.byteLength < spectrumByteOffset + spectrumByteLength) {
+        console.warn('Not enough data for panorama bins');
+        return null;
+    }
+
+    const spectrum = new Float32Array(buffer.slice(spectrumByteOffset, spectrumByteOffset + spectrumByteLength));
+
+    return {
+        type: 'sweep_panorama',
+        sweepId,
+        sweepMode,
+        freqStart,
+        freqEnd,
+        numBins,
+        sweepTimeMs,
+        timestamp,
+        spectrum,
     };
 }

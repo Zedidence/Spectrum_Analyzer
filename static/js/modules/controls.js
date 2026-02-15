@@ -52,11 +52,26 @@ export class Controls {
             rbwDisplay: document.getElementById('rbw-display'),
             // Frequency step size
             freqStep: document.getElementById('freq-step'),
+            // Sweep controls
+            sweepModeSelect: document.getElementById('sweep-mode-select'),
+            sweepStartFreq: document.getElementById('sweep-start-freq'),
+            sweepEndFreq: document.getElementById('sweep-end-freq'),
+            sweepRangeControls: document.getElementById('sweep-range-controls'),
+            sweepRate: document.getElementById('sweep-rate'),
+            sweepAverages: document.getElementById('sweep-averages'),
+            sweepStartBtn: document.getElementById('sweep-start-btn'),
+            sweepStopBtn: document.getElementById('sweep-stop-btn'),
+            sweepProgressContainer: document.getElementById('sweep-progress-container'),
+            sweepProgressBar: document.getElementById('sweep-progress-bar'),
+            sweepProgressText: document.getElementById('sweep-progress-text'),
+            sweepTimeText: document.getElementById('sweep-time-text'),
+            modeIndicator: document.getElementById('mode-indicator'),
         };
 
         this._setupControls();
         this._setupDSPControls();
         this._setupDisplayControls();
+        this._setupSweepControls();
         this._setupKeyboard();
         this._setupStateListeners();
     }
@@ -189,6 +204,49 @@ export class Controls {
         // AGC
         els.agcToggle.addEventListener('change', () => {
             conn.send('set_agc', { enabled: els.agcToggle.checked });
+        });
+    }
+
+    _setupSweepControls() {
+        const { _els: els, _conn: conn, _state: state } = this;
+
+        // Mode select — show/hide band monitor range controls
+        els.sweepModeSelect.addEventListener('change', () => {
+            const mode = els.sweepModeSelect.value;
+            els.sweepRangeControls.style.display =
+                mode === 'band_monitor' ? '' : 'none';
+        });
+
+        // Start sweep
+        els.sweepStartBtn.addEventListener('click', () => {
+            const mode = els.sweepModeSelect.value;
+            if (mode === 'off') return;
+
+            const params = {
+                mode,
+                sample_rate: parseFloat(els.sweepRate.value),
+                averages: parseInt(els.sweepAverages.value),
+            };
+
+            if (mode === 'band_monitor') {
+                params.freq_start = parseFloat(els.sweepStartFreq.value) * 1e6;
+                params.freq_end = parseFloat(els.sweepEndFreq.value) * 1e6;
+            } else {
+                params.freq_start = 47e6;
+                params.freq_end = 6e9;
+            }
+
+            conn.send('sweep_start', params);
+            els.sweepStartBtn.disabled = true;
+            els.sweepStopBtn.disabled = false;
+            els.sweepProgressContainer.style.display = '';
+        });
+
+        // Stop sweep
+        els.sweepStopBtn.addEventListener('click', () => {
+            conn.send('sweep_stop');
+            els.sweepStartBtn.disabled = false;
+            els.sweepStopBtn.disabled = true;
         });
     }
 
@@ -331,6 +389,47 @@ export class Controls {
             }
         }
 
+        // Sweep state
+        if (status.sweep_mode !== undefined) {
+            this._state.set('sweepMode', status.sweep_mode);
+            _syncSelect(els.sweepModeSelect, status.sweep_mode);
+            els.sweepRangeControls.style.display =
+                status.sweep_mode === 'band_monitor' ? '' : 'none';
+        }
+
+        if (status.sweep_running !== undefined) {
+            this._state.set('sweepRunning', status.sweep_running);
+            els.sweepStartBtn.disabled = status.sweep_running;
+            els.sweepStopBtn.disabled = !status.sweep_running;
+            els.sweepProgressContainer.style.display =
+                status.sweep_running ? '' : 'none';
+        }
+
+        if (status.sweep_progress !== undefined) {
+            this._state.set('sweepProgress', status.sweep_progress);
+            const pct = Math.round(status.sweep_progress * 100);
+            els.sweepProgressBar.style.width = pct + '%';
+            els.sweepProgressText.textContent = pct + '%';
+        }
+
+        if (status.sweep_last_duration_ms !== undefined && status.sweep_last_duration_ms > 0) {
+            els.sweepTimeText.textContent =
+                (status.sweep_last_duration_ms / 1000).toFixed(1) + 's';
+        }
+
+        // Playback state
+        if (status.playback_active !== undefined) {
+            this._state.set('playbackActive', status.playback_active);
+        }
+
+        // Recording state
+        if (status.iq_recording !== undefined) {
+            this._state.set('iqRecording', status.iq_recording);
+        }
+
+        // Mode indicator
+        this._updateModeIndicator();
+
         // Update RBW display
         this._updateRBW();
     }
@@ -356,6 +455,48 @@ export class Controls {
 
         if (data.waterfallLines !== undefined && els.waterfallHistory) {
             els.waterfallHistory.textContent = data.waterfallLines;
+        }
+    }
+
+    /**
+     * Update the mode indicator badge in the header.
+     * Priority: PLAYBACK > SWEEP > RECORDING > LIVE > hidden
+     */
+    _updateModeIndicator() {
+        const el = this._els.modeIndicator;
+        if (!el) return;
+
+        const sweepMode = this._state.get('sweepMode');
+        const sweepRunning = this._state.get('sweepRunning');
+        const streaming = this._state.get('streaming');
+        const playbackActive = this._state.get('playbackActive');
+        const iqRecording = this._state.get('iqRecording');
+
+        if (playbackActive) {
+            el.style.display = '';
+            el.textContent = 'PLAYBACK';
+            el.className = 'badge-playback';
+        } else if (sweepRunning) {
+            el.style.display = '';
+            if (sweepMode === 'survey') {
+                el.textContent = 'SURVEY';
+                el.className = 'badge-sweep';
+            } else {
+                el.textContent = 'BAND MONITOR';
+                el.className = 'badge-sweep';
+            }
+        } else if (iqRecording && streaming) {
+            el.style.display = '';
+            el.textContent = 'RECORDING';
+            el.className = 'badge-recording';
+        } else if (streaming) {
+            el.style.display = '';
+            el.textContent = 'LIVE';
+            el.className = 'badge-live';
+        } else {
+            el.style.display = '';
+            el.textContent = 'IDLE';
+            el.className = 'badge-idle';
         }
     }
 
@@ -392,7 +533,7 @@ function _syncSelect(selectEl, value) {
     }
     // Try numeric proximity (for sample rate / bandwidth where values may differ slightly)
     const numVal = parseFloat(value);
-    if (!isNaN(numVal)) {
+    if (!isNaN(numVal) && numVal !== 0) {
         let closest = null;
         let closestDist = Infinity;
         for (const opt of selectEl.options) {
@@ -402,8 +543,12 @@ function _syncSelect(selectEl, value) {
                 closest = opt.value;
             }
         }
-        if (closest !== null) {
+        // Only accept if within 10% of the target value
+        const maxDist = Math.abs(numVal) * 0.1;
+        if (closest !== null && closestDist <= maxDist) {
             selectEl.value = closest;
+        } else if (closest !== null) {
+            console.warn(`_syncSelect: value ${numVal} has no close match (nearest: ${closest}, dist: ${closestDist})`);
         }
     }
 }

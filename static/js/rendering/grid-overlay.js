@@ -28,6 +28,11 @@ export class GridOverlay {
         // Markers
         this._markers = [];
 
+        // Detected signals
+        this._detectedSignals = [];
+        this._signalColor = 'rgba(251, 191, 36, 0.25)';
+        this._signalBorderColor = 'rgba(251, 191, 36, 0.6)';
+
         // Colors
         this._gridColor = 'rgba(58, 69, 88, 0.4)';
         this._textColor = '#a0b0c0';
@@ -67,6 +72,7 @@ export class GridOverlay {
         if (params.viewStart !== undefined) this._viewStart = params.viewStart;
         if (params.viewEnd !== undefined) this._viewEnd = params.viewEnd;
         if (params.markers !== undefined) this._markers = params.markers;
+        if (params.detectedSignals !== undefined) this._detectedSignals = params.detectedSignals;
     }
 
     render() {
@@ -78,6 +84,7 @@ export class GridOverlay {
 
         ctx.clearRect(0, 0, w, h);
 
+        this._drawDetectedSignals(ctx, w, h);
         this._drawGrid(ctx, w, h);
         this._drawDbLabels(ctx, w, h);
         this._drawFreqLabels(ctx, w, h);
@@ -151,6 +158,65 @@ export class GridOverlay {
             const normInView = (freq - viewFreqStart) / viewFreqSpan;
             const x = normInView * w;
             ctx.fillText(this._formatFreq(freq), x, h - 2);
+        }
+    }
+
+    _drawDetectedSignals(ctx, w, h) {
+        if (!this._detectedSignals || this._detectedSignals.length === 0) return;
+
+        const viewSpan = this._viewEnd - this._viewStart;
+        const freqStart = this._centerFreq - this._sampleRate / 2;
+        const viewFreqStart = freqStart + this._viewStart * this._sampleRate;
+        const viewFreqSpan = viewSpan * this._sampleRate;
+
+        for (const sig of this._detectedSignals) {
+            const sigLeft = sig.center_freq - sig.bandwidth / 2;
+            const sigRight = sig.center_freq + sig.bandwidth / 2;
+
+            const xLeft = ((sigLeft - viewFreqStart) / viewFreqSpan) * w;
+            const xRight = ((sigRight - viewFreqStart) / viewFreqSpan) * w;
+
+            // Skip if completely out of view
+            if (xRight < 0 || xLeft > w) continue;
+
+            const clampedLeft = Math.max(0, xLeft);
+            const clampedRight = Math.min(w, xRight);
+            const width = clampedRight - clampedLeft;
+
+            if (width < 1) continue;
+
+            // Draw highlight band
+            ctx.fillStyle = this._signalColor;
+            ctx.fillRect(clampedLeft, 0, width, h);
+
+            // Draw left/right borders
+            ctx.strokeStyle = this._signalBorderColor;
+            ctx.lineWidth = 1;
+            if (xLeft >= 0 && xLeft <= w) {
+                ctx.beginPath();
+                ctx.moveTo(xLeft, 0);
+                ctx.lineTo(xLeft, h);
+                ctx.stroke();
+            }
+            if (xRight >= 0 && xRight <= w) {
+                ctx.beginPath();
+                ctx.moveTo(xRight, 0);
+                ctx.lineTo(xRight, h);
+                ctx.stroke();
+            }
+
+            // Label at top
+            if (width > 30) {
+                const cx = (clampedLeft + clampedRight) / 2;
+                ctx.fillStyle = 'rgba(251, 191, 36, 0.85)';
+                ctx.font = 'bold 9px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'top';
+                ctx.fillText(
+                    sig.peak_power.toFixed(0) + ' dB',
+                    cx, 3,
+                );
+            }
         }
     }
 

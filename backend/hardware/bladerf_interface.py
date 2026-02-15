@@ -37,7 +37,9 @@ class DataSink(gr.sync_block):
         )
         self._chunk_size = chunk_size
         self._queue = output_queue
-        self._buffer = np.empty(0, dtype=np.complex64)
+        # Pre-allocated ring buffer (2x chunk size is sufficient for accumulation)
+        self._buffer = np.empty(chunk_size * 4, dtype=np.complex64)
+        self._write_pos = 0
         self._drop_count = 0
         self._last_drop_log = 0.0
         self._sample_count = 0
@@ -47,12 +49,27 @@ class DataSink(gr.sync_block):
         n = len(samples)
         self._sample_count += n
 
-        # Accumulate into buffer, emit chunk_size blocks
-        self._buffer = np.concatenate([self._buffer, samples])
+        # Copy into pre-allocated buffer
+        new_pos = self._write_pos + n
+        if new_pos > len(self._buffer):
+            # Buffer would overflow — grow it (rare, one-time)
+            new_size = max(len(self._buffer) * 2, new_pos + self._chunk_size)
+            new_buf = np.empty(new_size, dtype=np.complex64)
+            new_buf[:self._write_pos] = self._buffer[:self._write_pos]
+            self._buffer = new_buf
 
-        while len(self._buffer) >= self._chunk_size:
+        self._buffer[self._write_pos:self._write_pos + n] = samples
+        self._write_pos += n
+
+        # Emit chunk_size blocks
+        while self._write_pos >= self._chunk_size:
             chunk = self._buffer[:self._chunk_size].copy()
-            self._buffer = self._buffer[self._chunk_size:]
+
+            # Shift remaining data to front
+            remaining = self._write_pos - self._chunk_size
+            if remaining > 0:
+                self._buffer[:remaining] = self._buffer[self._chunk_size:self._write_pos]
+            self._write_pos = remaining
 
             try:
                 self._queue.put_nowait(chunk)
@@ -160,20 +177,24 @@ class BladeRFInterface:
         logger.info("Stopping streaming...")
         self._running.clear()
 
-        # Stop flowgraph FIRST (unblocks the thread)
+        # Signal the flowgraph to unblock the thread
         if self._flowgraph:
             try:
                 self._flowgraph.stop()
             except Exception as e:
                 logger.debug("Flowgraph stop exception: %s", e)
 
-        # Then join thread
+        # Join thread — thread's finally block does stop()/wait()
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=5.0)
             if self._thread.is_alive():
                 logger.warning("GNU Radio thread did not exit in 5s")
+                # Thread still alive — don't destroy flowgraph it may be using
+                self._thread = None
+                return
 
-        self._destroy_flowgraph()
+        # Thread has fully exited, safe to release resources
+        self._release_flowgraph_refs()
         self._thread = None
         logger.info("Streaming stopped")
 
@@ -217,16 +238,24 @@ class BladeRFInterface:
         except Exception:
             logger.error("Flowgraph thread error", exc_info=True)
         finally:
-            if self._flowgraph:
+            # Thread owns the stop/wait lifecycle
+            fg = self._flowgraph
+            if fg:
                 try:
-                    self._flowgraph.stop()
-                    self._flowgraph.wait()
+                    fg.stop()
+                    fg.wait()
                 except Exception:
                     pass
             logger.info("GNU Radio thread exited")
 
+    def _release_flowgraph_refs(self):
+        """Release GNU Radio object references (call only after thread has exited)."""
+        self._flowgraph = None
+        self._sdr_source = None
+        self._data_sink = None
+
     def _destroy_flowgraph(self):
-        """Release GNU Radio resources."""
+        """Stop flowgraph if running and release resources."""
         if self._flowgraph:
             try:
                 self._flowgraph.stop()
@@ -234,9 +263,7 @@ class BladeRFInterface:
             except Exception:
                 pass
 
-        self._flowgraph = None
-        self._sdr_source = None
-        self._data_sink = None
+        self._release_flowgraph_refs()
 
     # --- Thread-safe parameter setters ---
 
@@ -297,6 +324,19 @@ class BladeRFInterface:
                 'gain': self._gain,
                 'running': self._running.is_set(),
             }
+
+    def flush_iq_queue(self, n_chunks):
+        """Discard n_chunks from the IQ queue. Used by sweep engine after retune."""
+        if not self._iq_queue:
+            return 0
+        discarded = 0
+        while discarded < n_chunks:
+            try:
+                self._iq_queue.get(timeout=0.5)
+                discarded += 1
+            except queue.Empty:
+                break
+        return discarded
 
     def cleanup(self):
         """Full cleanup: stop streaming and release resources."""

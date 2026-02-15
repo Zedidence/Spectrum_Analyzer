@@ -79,7 +79,7 @@ body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background-color: var(--bg-primary);
     color: var(--text-primary);
-    overflow: hidden;
+    overflow: auto;
 }
 
 /* ========================================
@@ -246,6 +246,19 @@ header h1 {
     border: 1px solid rgba(0, 255, 136, 0.3);
 }
 
+.badge-sweep {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    vertical-align: middle;
+    background-color: rgba(139, 92, 246, 0.15);
+    color: #a78bfa;
+    border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
 .badge-stop-required {
     display: inline-block;
     padding: 1px 6px;
@@ -257,6 +270,181 @@ header h1 {
     background-color: rgba(251, 191, 36, 0.15);
     color: var(--accent-yellow);
     border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+/* Signal list */
+.signal-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 8px 0 4px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.signal-list-scroll {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid var(--border-primary);
+    border-radius: 4px;
+    background: var(--bg-secondary);
+}
+
+.signal-item {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border-primary);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.signal-item:last-child {
+    border-bottom: none;
+}
+
+.signal-item:hover {
+    background: var(--bg-tertiary);
+}
+
+.signal-freq {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-family: monospace;
+}
+
+.signal-class {
+    display: inline-block;
+    padding: 0 4px;
+    border-radius: 3px;
+    font-size: 9px;
+    font-weight: 700;
+    background: rgba(139, 92, 246, 0.15);
+    color: #a78bfa;
+    margin-left: 4px;
+}
+
+.signal-details {
+    display: flex;
+    gap: 10px;
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    font-family: monospace;
+}
+
+.signal-empty {
+    padding: 12px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+/* Recording badge */
+.badge-recording {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    vertical-align: middle;
+    background-color: rgba(255, 68, 68, 0.15);
+    color: var(--accent-red);
+    border: 1px solid rgba(255, 68, 68, 0.3);
+    animation: badge-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes badge-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+/* Playback badge */
+.badge-playback {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    vertical-align: middle;
+    background-color: rgba(0, 217, 255, 0.15);
+    color: var(--accent-cyan);
+    border: 1px solid rgba(0, 217, 255, 0.3);
+}
+
+/* Idle badge */
+.badge-idle {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 8px;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    vertical-align: middle;
+    background-color: rgba(106, 122, 138, 0.15);
+    color: var(--text-muted);
+    border: 1px solid rgba(106, 122, 138, 0.3);
+}
+
+/* Recording file list items */
+.recording-item {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border-primary);
+}
+
+.recording-item:last-child {
+    border-bottom: none;
+}
+
+.recording-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+}
+
+.recording-name {
+    font-family: monospace;
+    font-size: 10px;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.recording-details {
+    display: flex;
+    gap: 10px;
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.recording-actions {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.recording-actions .btn-small {
+    font-size: 10px;
+    padding: 2px 6px;
+}
+
+.rec-download-btn {
+    text-decoration: none;
+    color: var(--text-secondary);
+    padding: 2px 6px;
+    font-size: 10px;
+    border: 1px solid var(--border-primary);
+    border-radius: var(--border-radius-sm);
+    background-color: var(--bg-tertiary);
+}
+
+.rec-download-btn:hover {
+    border-color: var(--accent-cyan);
+    color: var(--accent-cyan);
 }
 
 /* Disabled form controls */
@@ -534,6 +722,17 @@ footer {
     color: var(--text-muted);
 }
 
+footer kbd {
+    display: inline-block;
+    padding: 0 4px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: 3px;
+    font-family: monospace;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
 /* ========================================
    10. Scrollbar Styling
    ======================================== */
@@ -556,7 +755,99 @@ footer {
 }
 
 /* ========================================
-   11. Responsive Design
+   11. Keyboard Shortcut Help Overlay
+   ======================================== */
+
+.shortcut-help-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10, 14, 39, 0.85);
+    backdrop-filter: blur(4px);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: overlay-fade-in 0.15s ease-out;
+}
+
+@keyframes overlay-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.shortcut-help-panel {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--border-radius-xl);
+    padding: 24px 32px;
+    max-width: 600px;
+    width: 90%;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.shortcut-help-panel h3 {
+    color: var(--accent-cyan);
+    font-size: var(--font-xl);
+    margin-bottom: 16px;
+    text-align: center;
+}
+
+.shortcut-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.shortcut-group h4 {
+    color: var(--text-secondary);
+    font-size: var(--font-sm);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.shortcut-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 0;
+    font-size: var(--font-sm);
+    color: var(--text-primary);
+}
+
+.shortcut-row kbd {
+    display: inline-block;
+    min-width: 24px;
+    padding: 2px 6px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--border-radius-sm);
+    font-family: monospace;
+    font-size: var(--font-xs);
+    color: var(--accent-cyan);
+    text-align: center;
+}
+
+.shortcut-dismiss {
+    text-align: center;
+    margin-top: 16px;
+    font-size: var(--font-xs);
+    color: var(--text-muted);
+}
+
+.shortcut-dismiss kbd {
+    display: inline-block;
+    padding: 1px 5px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-primary);
+    border-radius: var(--border-radius-sm);
+    font-family: monospace;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+/* ========================================
+   12. Responsive Design
    ======================================== */
 
 @media (max-width: 1024px) {
@@ -574,9 +865,17 @@ footer {
     .display-area {
         flex-direction: column;
     }
+
+    .shortcut-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 @media (max-width: 768px) {
+    header {
+        padding: var(--spacing-sm) var(--spacing-lg);
+    }
+
     header h1 {
         font-size: var(--font-xl);
     }
@@ -586,11 +885,24 @@ footer {
     }
 
     .display-area {
-        padding: var(--spacing-lg);
-        gap: var(--spacing-lg);
+        padding: var(--spacing-sm);
+        gap: var(--spacing-sm);
+    }
+
+    .display-header {
+        padding: var(--spacing-sm) var(--spacing-md);
     }
 
     .preset-buttons {
         grid-template-columns: 1fr;
+    }
+
+    .btn {
+        padding: 10px var(--spacing-lg);
+        font-size: var(--font-sm);
+    }
+
+    footer {
+        padding: var(--spacing-sm) var(--spacing-lg);
     }
 }
